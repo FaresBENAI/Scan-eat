@@ -13,21 +13,69 @@ export default function Login() {
   const [error, setError] = useState('');
   const router = useRouter();
 
+  const detectUserType = async (userId) => {
+    try {
+      // Vérifier d'abord dans la table restaurants
+      const { data: restaurantData, error: restaurantError } = await supabase
+        .from('restaurants')
+        .select('id, name')
+        .eq('id', userId)
+        .single();
+
+      if (restaurantData && !restaurantError) {
+        return { type: 'restaurant', data: restaurantData };
+      }
+
+      // Si pas trouvé dans restaurants, vérifier dans customers
+      const { data: customerData, error: customerError } = await supabase
+        .from('customers')
+        .select('id, name')
+        .eq('id', userId)
+        .single();
+
+      if (customerData && !customerError) {
+        return { type: 'customer', data: customerData };
+      }
+
+      // Si trouvé nulle part, erreur
+      throw new Error('Profil utilisateur non trouvé');
+
+    } catch (error) {
+      console.error('Erreur détection type:', error);
+      throw error;
+    }
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      // 1. Authentification Supabase
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) {
+      if (authError) throw authError;
+
+      // 2. Détecter le type d'utilisateur
+      const userInfo = await detectUserType(authData.user.id);
+
+      // 3. Rediriger selon le type
+      if (userInfo.type === 'restaurant') {
+        router.push('/dashboard');
+      } else if (userInfo.type === 'customer') {
+        // Pour l'instant, rediriger vers l'accueil
+        // Plus tard on aura un dashboard client
+        router.push('/');
+      }
+
+    } catch (error) {
       setError(error.message);
-    } else {
-      router.push('/dashboard');
     }
+    
     setLoading(false);
   };
 
@@ -36,7 +84,7 @@ export default function Login() {
       <div className="auth-card">
         <div className="auth-header">
           <h1>Connexion à Scan-eat</h1>
-          <p>Accédez à votre dashboard restaurant</p>
+          <p>Connectez-vous à votre compte restaurant ou client</p>
         </div>
 
         <form onSubmit={handleLogin} className="auth-form">
@@ -70,6 +118,17 @@ export default function Login() {
             {loading ? 'Connexion...' : 'Se connecter'}
           </button>
         </form>
+
+        <div className="login-info">
+          <div className="user-types">
+            <div className="user-type">
+              <strong>Restaurant :</strong> Accédez à votre dashboard de gestion
+            </div>
+            <div className="user-type">
+              <strong>Client :</strong> Consultez vos commandes et favoris
+            </div>
+          </div>
+        </div>
 
         <div className="auth-footer">
           <p>Pas encore de compte ?{' '}

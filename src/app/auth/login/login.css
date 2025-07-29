@@ -123,3 +123,36 @@
   font-size: 0.9rem;
   opacity: 0.8;
 }
+
+.login-info {
+  margin: 1.5rem 0;
+  padding: 1.5rem;
+  background: rgba(29, 33, 41, 0.02);
+  border-radius: 12px;
+  border: 1px solid rgba(208, 213, 221, 0.3);
+}
+
+.user-types {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.user-type {
+  font-size: 0.9rem;
+  color: #495057;
+}
+
+.user-type strong {
+  color: #1d2129;
+}
+
+@media (max-width: 480px) {
+  .user-types {
+    gap: 0.75rem;
+  }
+  
+  .user-type {
+    font-size: 0.85rem;
+  }
+}
