@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import './callback.css';
 
-export default function AuthCallback() {
+function CallbackContent() {
   const [status, setStatus] = useState('loading');
   const [message, setMessage] = useState('');
   const [userType, setUserType] = useState('');
@@ -127,5 +127,23 @@ export default function AuthCallback() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function AuthCallback() {
+  return (
+    <Suspense fallback={
+      <div className="callback-container">
+        <div className="callback-card">
+          <div className="callback-icon loading">
+            <div className="spinner"></div>
+          </div>
+          <h1>Chargement...</h1>
+          <p>Préparation de la confirmation.</p>
+        </div>
+      </div>
+    }>
+      <CallbackContent />
+    </Suspense>
   );
 }
