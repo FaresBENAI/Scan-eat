@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useRouter } from 'next/navigation';
-import { QrCode, Users, TrendingUp, Settings, LogOut, Menu, Plus } from 'lucide-react';
+import { QrCode, Users, TrendingUp, Settings, LogOut, Menu, Plus, Download, ExternalLink } from 'lucide-react';
 import './dashboard.css';
 
 export default function Dashboard() {
@@ -18,7 +18,6 @@ export default function Dashboard() {
 
   const checkAuth = async () => {
     try {
-      // Vérifier si l'utilisateur est connecté
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
@@ -28,7 +27,6 @@ export default function Dashboard() {
 
       setUser(user);
 
-      // Récupérer les données du restaurant
       const { data: restaurantData, error } = await supabase
         .from('restaurants')
         .select('*')
@@ -51,6 +49,23 @@ export default function Dashboard() {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push('/');
+  };
+
+  const downloadQRCode = () => {
+    if (restaurant?.qr_code_url) {
+      const link = document.createElement('a');
+      link.href = restaurant.qr_code_url;
+      link.download = `QR-${restaurant.name}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
+  const openMenuPreview = () => {
+    if (restaurant?.id) {
+      window.open(`/menu/${restaurant.id}`, '_blank');
+    }
   };
 
   if (loading) {
@@ -103,7 +118,7 @@ export default function Dashboard() {
         {/* Header */}
         <header className="dashboard-header">
           <div className="welcome-section">
-            <h1>Bonjour, {restaurant?.name || 'Restaurant'} ! 👋</h1>
+            <h1>Bonjour, {restaurant?.name || 'Restaurant'} !</h1>
             <p>Voici un aperçu de votre activité aujourd'hui</p>
           </div>
           <div className="header-actions">
@@ -113,6 +128,43 @@ export default function Dashboard() {
             </button>
           </div>
         </header>
+
+        {/* QR Code Section */}
+        {restaurant?.qr_code_url && (
+          <div className="qr-section">
+            <div className="qr-card">
+              <div className="qr-content">
+                <div className="qr-info">
+                  <h2>Votre QR Code</h2>
+                  <p>Imprimez et placez ce QR code sur vos tables pour que vos clients puissent accéder au menu</p>
+                  <div className="qr-actions">
+                    <button onClick={downloadQRCode} className="btn-download">
+                      <Download size={20} />
+                      Télécharger PNG
+                    </button>
+                    <button onClick={openMenuPreview} className="btn-preview">
+                      <ExternalLink size={20} />
+                      Voir le menu
+                    </button>
+                  </div>
+                </div>
+                <div className="qr-display">
+                  <div className="qr-container">
+                    <img 
+                      src={restaurant.qr_code_url} 
+                      alt={`QR Code pour ${restaurant.name}`}
+                      className="qr-image"
+                    />
+                    <div className="qr-label">
+                      <QrCode size={16} />
+                      <span>Scannez pour commander</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Stats Cards */}
         <div className="stats-grid">
@@ -170,9 +222,9 @@ export default function Dashboard() {
 
             <div className="action-card">
               <QrCode size={40} />
-              <h3>Télécharger le QR Code</h3>
-              <p>Imprimez et placez sur vos tables</p>
-              <button className="action-btn">Télécharger</button>
+              <h3>Imprimer le QR Code</h3>
+              <p>Téléchargez et imprimez votre QR code pour vos tables</p>
+              <button onClick={downloadQRCode} className="action-btn">Télécharger</button>
             </div>
 
             <div className="action-card">
@@ -199,6 +251,10 @@ export default function Dashboard() {
             </div>
             <div className="info-item">
               <strong>Adresse:</strong> {restaurant?.address || 'Non renseignée'}
+            </div>
+            <div className="info-item">
+              <strong>URL Menu:</strong> 
+              <span className="menu-url">{`${window.location.origin}/menu/${restaurant?.id}`}</span>
             </div>
           </div>
         </div>
