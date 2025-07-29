@@ -58,69 +58,33 @@ function CallbackContent() {
       // Récupérer tous les paramètres de l'URL
       const token = searchParams.get('token');
       const type = searchParams.get('type');
-      const access_token = searchParams.get('access_token');
-      const refresh_token = searchParams.get('refresh_token');
       
-      addDebug(`📋 Paramètres URL: token=${token ? 'OUI' : 'NON'}, type=${type}, access_token=${access_token ? 'OUI' : 'NON'}`);
+      addDebug(`📋 Paramètres URL: token=${token ? 'OUI' : 'NON'}, type=${type}`);
 
-      // Méthode 1: Si on a les tokens d'accès
-      if (access_token && refresh_token) {
-        addDebug('🔑 Tentative avec access/refresh tokens');
-        
-        const { data, error } = await supabase.auth.setSession({
-          access_token,
-          refresh_token
-        });
-        
-        if (error) {
-          addDebug(`❌ Erreur setSession: ${error.message}`);
-          throw error;
-        }
-        
-        if (data.user) {
-          addDebug(`✅ Utilisateur connecté: ${data.user.id}`);
-          const userInfo = await detectUserType(data.user.id);
-          setUserType(userInfo.type);
-          setStatus('success');
-          setMessage('Votre compte a été confirmé avec succès.');
-
-          setTimeout(() => {
-            if (userInfo.type === 'restaurant') {
-              router.push('/dashboard');
-            } else {
-              router.push('/');
-            }
-          }, 3000);
-          return;
-        }
-      }
-
-      // Méthode 2: Avec le token hash
       if (token && type) {
-        addDebug(`🔍 Tentative verifyOtp avec token et type=${type}`);
+        addDebug(`🔍 Tentative avec exchangeCodeForSession`);
         
-        const { data, error } = await supabase.auth.verifyOtp({
-          token_hash: token,
-          type: type === 'signup' ? 'signup' : 'email'
-        });
+        // Nouvelle méthode recommandée par Supabase
+        const { data, error } = await supabase.auth.exchangeCodeForSession(token);
         
         if (error) {
-          addDebug(`❌ Erreur verifyOtp (${type}): ${error.message}`);
+          addDebug(`❌ Erreur exchangeCodeForSession: ${error.message}`);
           
-          // Essayer avec type 'magiclink'
-          addDebug('🔄 Tentative avec type magiclink');
+          // Fallback: essayer l'ancienne méthode
+          addDebug(`🔄 Fallback vers verifyOtp`);
+          
           const { data: data2, error: error2 } = await supabase.auth.verifyOtp({
             token_hash: token,
-            type: 'magiclink'
+            type: 'email'
           });
           
           if (error2) {
-            addDebug(`❌ Erreur verifyOtp (magiclink): ${error2.message}`);
+            addDebug(`❌ Erreur verifyOtp: ${error2.message}`);
             throw error2;
           }
           
           if (data2.user) {
-            addDebug(`✅ Succès avec magiclink: ${data2.user.id}`);
+            addDebug(`✅ Succès verifyOtp: ${data2.user.id}`);
             const userInfo = await detectUserType(data2.user.id);
             setUserType(userInfo.type);
             setStatus('success');
@@ -136,7 +100,7 @@ function CallbackContent() {
             return;
           }
         } else if (data.user) {
-          addDebug(`✅ Succès verifyOtp: ${data.user.id}`);
+          addDebug(`✅ Succès exchangeCodeForSession: ${data.user.id}`);
           const userInfo = await detectUserType(data.user.id);
           setUserType(userInfo.type);
           setStatus('success');
@@ -153,7 +117,7 @@ function CallbackContent() {
         }
       }
 
-      // Méthode 3: Vérifier si déjà connecté
+      // Si pas de paramètres, vérifier si déjà connecté
       addDebug('🔍 Vérification session existante');
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       
@@ -177,9 +141,9 @@ function CallbackContent() {
           }
         }, 2000);
       } else {
-        addDebug('❌ Aucune session trouvée');
+        addDebug('❌ Aucune session trouvée - lien probablement expiré');
         setStatus('error');
-        setMessage('Lien de confirmation invalide ou expiré.');
+        setMessage('Lien de confirmation invalide ou expiré. Essayez de vous connecter directement.');
       }
     } catch (error) {
       addDebug(`💥 Erreur finale: ${error.message}`);
@@ -233,11 +197,11 @@ function CallbackContent() {
             <h1>Erreur de confirmation</h1>
             <p>{message}</p>
             <div className="callback-actions">
-              <Link href="/auth/register" className="btn-primary">
-                Créer un nouveau compte
+              <Link href="/auth/login" className="btn-primary">
+                Se connecter directement
               </Link>
-              <Link href="/auth/login" className="btn-secondary">
-                Se connecter
+              <Link href="/auth/register" className="btn-secondary">
+                Créer un nouveau compte
               </Link>
             </div>
           </>
