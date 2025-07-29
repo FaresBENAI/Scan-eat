@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { QrCode, Smartphone, CreditCard, BarChart3, Check } from 'lucide-react';
+import Link from 'next/link';
 import './Homepage.css';
 
 const Homepage = () => {
@@ -15,8 +16,12 @@ const Homepage = () => {
             <span className="brand-name">Scan-eat</span>
           </div>
           <div className="nav-buttons">
-            <button className="btn-secondary">Se connecter</button>
-            <button className="btn-primary">Essai gratuit</button>
+            <Link href="/auth/login">
+              <button className="btn-secondary">Se connecter</button>
+            </Link>
+            <Link href="/auth/register">
+              <button className="btn-primary">Essai gratuit</button>
+            </Link>
           </div>
         </nav>
       </header>
@@ -31,7 +36,9 @@ const Homepage = () => {
             Menu digital, commande et paiement en un scan. Augmentez vos ventes et simplifiez votre service.
           </p>
           <div className="hero-buttons">
-            <button className="btn-primary-large">Démarrer gratuitement</button>
+            <Link href="/auth/register">
+              <button className="btn-primary-large">Démarrer gratuitement</button>
+            </Link>
             <button className="btn-demo">Voir la démo</button>
           </div>
         </div>
@@ -145,7 +152,9 @@ const Homepage = () => {
                 <li>Support email</li>
                 <li>Statistiques basiques</li>
               </ul>
-              <button className="btn-outline">Commencer</button>
+              <Link href="/auth/register">
+                <button className="btn-outline">Commencer</button>
+              </Link>
             </div>
             <div className="pricing-card featured">
               <div className="popular-badge">Populaire</div>
@@ -161,7 +170,9 @@ const Homepage = () => {
                 <li>Support prioritaire</li>
                 <li>Analyses détaillées</li>
               </ul>
-              <button className="btn-primary">Commencer</button>
+              <Link href="/auth/register">
+                <button className="btn-primary">Commencer</button>
+              </Link>
             </div>
             <div className="pricing-card">
               <h3>Enterprise</h3>
@@ -176,7 +187,9 @@ const Homepage = () => {
                 <li>Support téléphonique</li>
                 <li>Formation incluse</li>
               </ul>
-              <button className="btn-outline">Nous contacter</button>
+              <Link href="/auth/register">
+                <button className="btn-outline">Nous contacter</button>
+              </Link>
             </div>
           </div>
         </div>
@@ -187,7 +200,9 @@ const Homepage = () => {
         <div className="container">
           <h2>Prêt à moderniser votre restaurant ?</h2>
           <p>Rejoignez des centaines de restaurants qui ont déjà fait le choix de l'innovation.</p>
-          <button className="btn-primary-large">Démarrer gratuitement</button>
+          <Link href="/auth/register">
+            <button className="btn-primary-large">Démarrer gratuitement</button>
+          </Link>
         </div>
       </section>
 

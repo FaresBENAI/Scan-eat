@@ -1,0 +1,22 @@
+@import '../login/login.css';
+
+.confirmation-content {
+  text-align: center;
+  padding: 2rem 0;
+}
+
+.confirmation-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.confirmation-content p {
+  margin-bottom: 1rem;
+  color: #495057;
+  line-height: 1.6;
+}
+
+.confirmation-content small {
+  color: #6c757d;
+  font-size: 0.9rem;
+}
