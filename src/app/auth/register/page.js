@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import QRCode from 'qrcode';
 import './register.css';
 
 export default function Register() {
@@ -24,6 +25,28 @@ export default function Register() {
       ...formData,
       [e.target.name]: e.target.value
     });
+  };
+
+  const generateQRCode = async (restaurantId) => {
+    try {
+      // URL vers le menu du restaurant
+      const menuUrl = `${window.location.origin}/menu/${restaurantId}`;
+      
+      // Générer le QR code en base64
+      const qrCodeDataUrl = await QRCode.toDataURL(menuUrl, {
+        width: 300,
+        margin: 2,
+        color: {
+          dark: '#1d2129',
+          light: '#ffffff'
+        }
+      });
+
+      return qrCodeDataUrl;
+    } catch (error) {
+      console.error('Erreur génération QR:', error);
+      return null;
+    }
   };
 
   const handleRegister = async (e) => {
@@ -53,7 +76,13 @@ export default function Register() {
 
       if (authError) throw authError;
 
-      // 2. Créer le profil restaurant
+      // 2. Générer le QR code
+      let qrCodeUrl = null;
+      if (authData.user) {
+        qrCodeUrl = await generateQRCode(authData.user.id);
+      }
+
+      // 3. Créer le profil restaurant avec QR code
       if (authData.user) {
         const { error: profileError } = await supabase
           .from('restaurants')
@@ -64,6 +93,7 @@ export default function Register() {
               name: formData.restaurantName,
               phone: formData.phone,
               address: formData.address,
+              qr_code_url: qrCodeUrl, // QR code généré automatiquement
             }
           ]);
 
@@ -182,6 +212,10 @@ export default function Register() {
           <button type="submit" disabled={loading} className="auth-button">
             {loading ? 'Création du compte...' : 'Créer mon compte'}
           </button>
+
+          <div className="qr-info">
+            <p><small>🎉 Votre QR code sera généré automatiquement !</small></p>
+          </div>
         </form>
 
         <div className="auth-footer">
