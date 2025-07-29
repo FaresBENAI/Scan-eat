@@ -6,6 +6,13 @@ import { useParams } from 'next/navigation';
 import { ShoppingCart, Plus, Minus, Clock, MapPin, Phone } from 'lucide-react';
 import './menu.css';
 
+// Fonction pour générer les paramètres statiques
+export async function generateStaticParams() {
+  // Pour l'export statique, on retourne un tableau vide
+  // Les pages seront générées dynamiquement côté client
+  return [];
+}
+
 export default function MenuPage() {
   const params = useParams();
   const restaurantId = params['restaurant-id'];
@@ -18,7 +25,9 @@ export default function MenuPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    loadRestaurantData();
+    if (restaurantId) {
+      loadRestaurantData();
+    }
   }, [restaurantId]);
 
   const loadRestaurantData = async () => {
@@ -41,7 +50,7 @@ export default function MenuPage() {
         .eq('is_active', true)
         .order('display_order');
 
-      if (categoriesError) throw categoriesError;
+      if (categoriesError && categoriesError.code !== 'PGRST116') throw categoriesError;
       setCategories(categoriesData || []);
 
       // Charger les plats
@@ -52,7 +61,7 @@ export default function MenuPage() {
         .eq('is_available', true)
         .order('display_order');
 
-      if (menuError) throw menuError;
+      if (menuError && menuError.code !== 'PGRST116') throw menuError;
       setMenuItems(menuData || []);
 
     } catch (error) {
