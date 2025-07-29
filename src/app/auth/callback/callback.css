@@ -1,4 +1,4 @@
-.confirmation-container {
+.callback-container {
   min-height: 100vh;
   background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
   display: flex;
@@ -7,7 +7,7 @@
   padding: 2rem;
 }
 
-.confirmation-card {
+.callback-card {
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(12px);
   border-radius: 24px;
@@ -19,80 +19,76 @@
   border: 1px solid rgba(208, 213, 221, 0.3);
 }
 
-.confirmation-icon {
-  margin-bottom: 2rem;
-}
-
-.email-icon {
-  font-size: 4rem;
-  background: rgba(52, 152, 219, 0.1);
-  width: 100px;
-  height: 100px;
-  border-radius: 50%;
+.callback-icon {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 2rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto;
+  border-radius: 50%;
+  font-size: 2.5rem;
+  font-weight: bold;
 }
 
-.confirmation-header h1 {
+.callback-icon.loading {
+  background: rgba(52, 152, 219, 0.1);
+  color: #3498db;
+}
+
+.callback-icon.success {
+  background: rgba(46, 204, 113, 0.1);
+  color: #2ecc71;
+}
+
+.callback-icon.error {
+  background: rgba(231, 76, 60, 0.1);
+  color: #e74c3c;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(52, 152, 219, 0.2);
+  border-top: 3px solid #3498db;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.callback-card h1 {
   color: #1d2129;
   font-size: 2rem;
   font-weight: 700;
   margin-bottom: 1rem;
 }
 
-.confirmation-header p {
+.callback-card p {
   color: #6c757d;
   font-size: 1.1rem;
   line-height: 1.6;
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
 }
 
-.confirmation-content {
+.redirect-info {
+  background: rgba(52, 152, 219, 0.1);
+  padding: 1rem;
+  border-radius: 12px;
   margin: 2rem 0;
 }
 
-.instruction-box {
-  background: rgba(46, 204, 113, 0.05);
-  border: 1px solid rgba(46, 204, 113, 0.2);
-  border-radius: 12px;
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
-  text-align: left;
-}
-
-.instruction-box h3 {
-  color: #2ecc71;
-  font-size: 1.1rem;
-  margin-bottom: 1rem;
-  text-align: center;
-}
-
-.instruction-box ol {
-  color: #495057;
-  line-height: 1.8;
-  padding-left: 1.5rem;
-}
-
-.instruction-box li {
-  margin-bottom: 0.5rem;
-}
-
-.spam-notice {
-  background: rgba(241, 196, 15, 0.1);
-  border: 1px solid rgba(241, 196, 15, 0.3);
-  border-radius: 12px;
-  padding: 1rem;
-}
-
-.spam-notice p {
-  color: #f39c12;
-  font-size: 0.95rem;
+.redirect-info p {
+  color: #3498db;
+  font-weight: 500;
   margin: 0;
+  font-size: 0.95rem;
 }
 
-.confirmation-footer {
+.callback-actions {
   display: flex;
   gap: 1rem;
   margin-top: 2rem;
@@ -133,11 +129,11 @@
 }
 
 @media (max-width: 600px) {
-  .confirmation-card {
+  .callback-card {
     padding: 3rem 2rem;
   }
   
-  .confirmation-footer {
+  .callback-actions {
     flex-direction: column;
   }
   
