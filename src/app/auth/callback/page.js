@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { CheckCircle, XCircle, Loader } from 'lucide-react';
+import { CheckCircle, XCircle, Loader, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import './callback.css';
 
@@ -11,8 +11,13 @@ function CallbackContent() {
   const [status, setStatus] = useState('loading');
   const [message, setMessage] = useState('');
   const [userType, setUserType] = useState('');
+  const [debugInfo, setDebugInfo] = useState([]);
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  const addDebug = (text) => {
+    setDebugInfo(prev => [...prev, `${new Date().toLocaleTimeString()}: ${text}`]);
+  };
 
   useEffect(() => {
     handleAuthCallback();
@@ -48,24 +53,32 @@ function CallbackContent() {
 
   const handleAuthCallback = async () => {
     try {
+      addDebug('🚀 Début de la vérification');
+      
       // Récupérer tous les paramètres de l'URL
       const token = searchParams.get('token');
       const type = searchParams.get('type');
       const access_token = searchParams.get('access_token');
       const refresh_token = searchParams.get('refresh_token');
       
-      console.log('URL params:', { token, type, access_token, refresh_token });
+      addDebug(`📋 Paramètres URL: token=${token ? 'OUI' : 'NON'}, type=${type}, access_token=${access_token ? 'OUI' : 'NON'}`);
 
       // Méthode 1: Si on a les tokens d'accès
       if (access_token && refresh_token) {
+        addDebug('🔑 Tentative avec access/refresh tokens');
+        
         const { data, error } = await supabase.auth.setSession({
           access_token,
           refresh_token
         });
         
-        if (error) throw error;
+        if (error) {
+          addDebug(`❌ Erreur setSession: ${error.message}`);
+          throw error;
+        }
         
         if (data.user) {
+          addDebug(`✅ Utilisateur connecté: ${data.user.id}`);
           const userInfo = await detectUserType(data.user.id);
           setUserType(userInfo.type);
           setStatus('success');
@@ -84,25 +97,30 @@ function CallbackContent() {
 
       // Méthode 2: Avec le token hash
       if (token && type) {
-        console.log('Trying token verification...');
+        addDebug(`🔍 Tentative verifyOtp avec token et type=${type}`);
         
         const { data, error } = await supabase.auth.verifyOtp({
           token_hash: token,
           type: type === 'signup' ? 'signup' : 'email'
         });
         
-        console.log('Verify result:', data, error);
-        
         if (error) {
+          addDebug(`❌ Erreur verifyOtp (${type}): ${error.message}`);
+          
           // Essayer avec type 'magiclink'
+          addDebug('🔄 Tentative avec type magiclink');
           const { data: data2, error: error2 } = await supabase.auth.verifyOtp({
             token_hash: token,
             type: 'magiclink'
           });
           
-          if (error2) throw error2;
+          if (error2) {
+            addDebug(`❌ Erreur verifyOtp (magiclink): ${error2.message}`);
+            throw error2;
+          }
           
           if (data2.user) {
+            addDebug(`✅ Succès avec magiclink: ${data2.user.id}`);
             const userInfo = await detectUserType(data2.user.id);
             setUserType(userInfo.type);
             setStatus('success');
@@ -118,6 +136,7 @@ function CallbackContent() {
             return;
           }
         } else if (data.user) {
+          addDebug(`✅ Succès verifyOtp: ${data.user.id}`);
           const userInfo = await detectUserType(data.user.id);
           setUserType(userInfo.type);
           setStatus('success');
@@ -135,11 +154,16 @@ function CallbackContent() {
       }
 
       // Méthode 3: Vérifier si déjà connecté
+      addDebug('🔍 Vérification session existante');
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       
-      if (sessionError) throw sessionError;
+      if (sessionError) {
+        addDebug(`❌ Erreur session: ${sessionError.message}`);
+        throw sessionError;
+      }
 
       if (sessionData.session) {
+        addDebug(`✅ Session trouvée: ${sessionData.session.user.id}`);
         const userInfo = await detectUserType(sessionData.session.user.id);
         setUserType(userInfo.type);
         setStatus('success');
@@ -153,11 +177,12 @@ function CallbackContent() {
           }
         }, 2000);
       } else {
+        addDebug('❌ Aucune session trouvée');
         setStatus('error');
         setMessage('Lien de confirmation invalide ou expiré.');
       }
     } catch (error) {
-      console.error('Callback error:', error);
+      addDebug(`💥 Erreur finale: ${error.message}`);
       setStatus('error');
       setMessage('Erreur lors de la confirmation : ' + error.message);
     }
@@ -216,6 +241,21 @@ function CallbackContent() {
               </Link>
             </div>
           </>
+        )}
+
+        {/* Debug Box */}
+        {debugInfo.length > 0 && (
+          <div className="debug-box">
+            <div className="debug-header">
+              <AlertCircle size={20} />
+              <span>Debug Info</span>
+            </div>
+            <div className="debug-content">
+              {debugInfo.map((info, index) => (
+                <div key={index} className="debug-line">{info}</div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </div>
