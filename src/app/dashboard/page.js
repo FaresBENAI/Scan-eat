@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { QrCode, Users, TrendingUp, Settings, LogOut, Menu, Plus, Download, ExternalLink } from 'lucide-react';
+import { QrCode, Users, TrendingUp, Settings, LogOut, Menu, Plus, Download, ExternalLink, CheckCircle } from 'lucide-react';
 import './dashboard.css';
 
-export default function Dashboard() {
+function DashboardContent() {
   const [user, setUser] = useState(null);
   const [restaurant, setRestaurant] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -22,7 +22,9 @@ export default function Dashboard() {
     if (type === 'signup') {
       setShowWelcome(true);
       // Nettoyer l'URL
-      window.history.replaceState({}, '', '/dashboard');
+      if (typeof window !== 'undefined') {
+        window.history.replaceState({}, '', '/dashboard');
+      }
     }
   }, []);
 
@@ -281,5 +283,18 @@ export default function Dashboard() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <Suspense fallback={
+      <div className="dashboard-loading">
+        <div className="loading-spinner"></div>
+        <p>Chargement de votre dashboard...</p>
+      </div>
+    }>
+      <DashboardContent />
+    </Suspense>
   );
 }
