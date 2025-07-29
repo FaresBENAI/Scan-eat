@@ -1,147 +1,141 @@
 .confirmation-container {
-  min-height: 100vh;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
+ min-height: 100vh;
+ background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ padding: 2rem;
 }
 
 .confirmation-card {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(12px);
-  border-radius: 24px;
-  padding: 4rem 3rem;
-  width: 100%;
-  max-width: 500px;
-  text-align: center;
-  box-shadow: 0 25px 50px rgba(29, 33, 41, 0.15);
-  border: 1px solid rgba(208, 213, 221, 0.3);
+ background: rgba(255, 255, 255, 0.95);
+ backdrop-filter: blur(12px);
+ border-radius: 24px;
+ padding: 4rem 3rem;
+ width: 100%;
+ max-width: 500px;
+ text-align: center;
+ box-shadow: 0 25px 50px rgba(29, 33, 41, 0.15);
+ border: 1px solid rgba(208, 213, 221, 0.3);
 }
 
 .confirmation-icon {
-  margin-bottom: 2rem;
-}
-
-.email-icon {
-  font-size: 4rem;
-  background: rgba(52, 152, 219, 0.1);
-  width: 100px;
-  height: 100px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto;
+ margin-bottom: 2rem;
+ color: #495057;
 }
 
 .confirmation-header h1 {
-  color: #1d2129;
-  font-size: 2rem;
-  font-weight: 700;
-  margin-bottom: 1rem;
+ color: #1d2129;
+ font-size: 2rem;
+ font-weight: 700;
+ margin-bottom: 1rem;
 }
 
 .confirmation-header p {
-  color: #6c757d;
-  font-size: 1.1rem;
-  line-height: 1.6;
-  margin-bottom: 2rem;
+ color: #6c757d;
+ font-size: 1.1rem;
+ line-height: 1.6;
+ margin-bottom: 2rem;
 }
 
 .confirmation-content {
-  margin: 2rem 0;
+ margin: 2rem 0;
 }
 
 .instruction-box {
-  background: rgba(46, 204, 113, 0.05);
-  border: 1px solid rgba(46, 204, 113, 0.2);
-  border-radius: 12px;
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
-  text-align: left;
+ background: rgba(29, 33, 41, 0.03);
+ border: 1px solid rgba(208, 213, 221, 0.3);
+ border-radius: 12px;
+ padding: 1.5rem;
+ margin-bottom: 1.5rem;
+ text-align: left;
 }
 
 .instruction-box h3 {
-  color: #2ecc71;
-  font-size: 1.1rem;
-  margin-bottom: 1rem;
-  text-align: center;
+ color: #1d2129;
+ font-size: 1.1rem;
+ font-weight: 600;
+ margin-bottom: 1rem;
+ text-align: center;
 }
 
 .instruction-box ol {
-  color: #495057;
-  line-height: 1.8;
-  padding-left: 1.5rem;
+ color: #495057;
+ line-height: 1.8;
+ padding-left: 1.5rem;
 }
 
 .instruction-box li {
-  margin-bottom: 0.5rem;
+ margin-bottom: 0.5rem;
 }
 
-.spam-notice {
-  background: rgba(241, 196, 15, 0.1);
-  border: 1px solid rgba(241, 196, 15, 0.3);
-  border-radius: 12px;
-  padding: 1rem;
+.notice-box {
+ background: rgba(29, 33, 41, 0.03);
+ border: 1px solid rgba(208, 213, 221, 0.3);
+ border-radius: 12px;
+ padding: 1rem;
 }
 
-.spam-notice p {
-  color: #f39c12;
-  font-size: 0.95rem;
-  margin: 0;
+.notice-box p {
+ color: #495057;
+ font-size: 0.95rem;
+ margin: 0;
+}
+
+.notice-box strong {
+ color: #1d2129;
 }
 
 .confirmation-footer {
-  display: flex;
-  gap: 1rem;
-  margin-top: 2rem;
-  flex-wrap: wrap;
-  justify-content: center;
+ display: flex;
+ gap: 1rem;
+ margin-top: 2rem;
+ flex-wrap: wrap;
+ justify-content: center;
 }
 
 .btn-primary, .btn-secondary {
-  padding: 0.75rem 1.5rem;
-  border-radius: 12px;
-  text-decoration: none;
-  font-weight: 600;
-  transition: all 0.2s ease;
-  display: inline-block;
+ padding: 0.75rem 1.5rem;
+ border-radius: 12px;
+ text-decoration: none;
+ font-weight: 600;
+ transition: all 0.2s ease;
+ display: inline-block;
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #1d2129 0%, #495057 100%);
-  color: white;
+ background: linear-gradient(135deg, #1d2129 0%, #495057 100%);
+ color: white;
 }
 
 .btn-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(29, 33, 41, 0.25);
+ transform: translateY(-1px);
+ box-shadow: 0 6px 20px rgba(29, 33, 41, 0.25);
 }
 
 .btn-secondary {
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(8px);
-  color: #495057;
-  border: 1px solid #d0d5dd;
+ background: rgba(255, 255, 255, 0.8);
+ backdrop-filter: blur(8px);
+ color: #495057;
+ border: 1px solid #d0d5dd;
 }
 
 .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.95);
-  border-color: #495057;
-  transform: translateY(-1px);
+ background: rgba(255, 255, 255, 0.95);
+ border-color: #495057;
+ transform: translateY(-1px);
 }
 
 @media (max-width: 600px) {
-  .confirmation-card {
-    padding: 3rem 2rem;
-  }
-  
-  .confirmation-footer {
-    flex-direction: column;
-  }
-  
-  .btn-primary, .btn-secondary {
-    width: 100%;
-  }
+ .confirmation-card {
+   padding: 3rem 2rem;
+ }
+ 
+ .confirmation-footer {
+   flex-direction: column;
+ }
+ 
+ .btn-primary, .btn-secondary {
+   width: 100%;
+ }
 }

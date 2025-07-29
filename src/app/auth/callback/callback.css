@@ -20,38 +20,11 @@
 }
 
 .callback-icon {
-  width: 80px;
-  height: 80px;
-  margin: 0 auto 2rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  font-size: 2.5rem;
-  font-weight: bold;
+  margin-bottom: 2rem;
+  color: #495057;
 }
 
-.callback-icon.loading {
-  background: rgba(52, 152, 219, 0.1);
-  color: #3498db;
-}
-
-.callback-icon.success {
-  background: rgba(46, 204, 113, 0.1);
-  color: #2ecc71;
-}
-
-.callback-icon.error {
-  background: rgba(231, 76, 60, 0.1);
-  color: #e74c3c;
-}
-
-.spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid rgba(52, 152, 219, 0.2);
-  border-top: 3px solid #3498db;
-  border-radius: 50%;
+.spinner-icon {
   animation: spin 1s linear infinite;
 }
 
@@ -75,14 +48,15 @@
 }
 
 .redirect-info {
-  background: rgba(52, 152, 219, 0.1);
+  background: rgba(29, 33, 41, 0.05);
   padding: 1rem;
   border-radius: 12px;
   margin: 2rem 0;
+  border: 1px solid rgba(208, 213, 221, 0.3);
 }
 
 .redirect-info p {
-  color: #3498db;
+  color: #495057;
   font-weight: 500;
   margin: 0;
   font-size: 0.95rem;

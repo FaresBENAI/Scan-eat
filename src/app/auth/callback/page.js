@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { CheckCircle, XCircle, Loader } from 'lucide-react';
 import Link from 'next/link';
 import './callback.css';
 
@@ -55,9 +56,8 @@ function CallbackContent() {
         const userInfo = await detectUserType(data.session.user.id);
         setUserType(userInfo.type);
         setStatus('success');
-        setMessage('Votre compte a été confirmé avec succès !');
+        setMessage('Votre compte a été confirmé avec succès.');
 
-        // Redirection automatique après 3 secondes
         setTimeout(() => {
           if (userInfo.type === 'restaurant') {
             router.push('/dashboard');
@@ -80,21 +80,23 @@ function CallbackContent() {
       <div className="callback-card">
         {status === 'loading' && (
           <>
-            <div className="callback-icon loading">
-              <div className="spinner"></div>
+            <div className="callback-icon">
+              <Loader size={48} className="spinner-icon" />
             </div>
-            <h1>Confirmation en cours...</h1>
+            <h1>Confirmation en cours</h1>
             <p>Nous vérifions votre lien de confirmation.</p>
           </>
         )}
 
         {status === 'success' && (
           <>
-            <div className="callback-icon success">✓</div>
-            <h1>Compte confirmé !</h1>
+            <div className="callback-icon">
+              <CheckCircle size={48} />
+            </div>
+            <h1>Compte confirmé</h1>
             <p>{message}</p>
             <div className="redirect-info">
-              <p>Redirection automatique vers votre {userType === 'restaurant' ? 'dashboard' : 'accueil'} dans 3 secondes...</p>
+              <p>Redirection automatique vers votre {userType === 'restaurant' ? 'dashboard' : 'accueil'} dans 3 secondes</p>
             </div>
             <div className="callback-actions">
               {userType === 'restaurant' ? (
@@ -112,7 +114,9 @@ function CallbackContent() {
 
         {status === 'error' && (
           <>
-            <div className="callback-icon error">✗</div>
+            <div className="callback-icon">
+              <XCircle size={48} />
+            </div>
             <h1>Erreur de confirmation</h1>
             <p>{message}</p>
             <div className="callback-actions">
@@ -135,10 +139,10 @@ export default function AuthCallback() {
     <Suspense fallback={
       <div className="callback-container">
         <div className="callback-card">
-          <div className="callback-icon loading">
-            <div className="spinner"></div>
+          <div className="callback-icon">
+            <Loader size={48} className="spinner-icon" />
           </div>
-          <h1>Chargement...</h1>
+          <h1>Chargement</h1>
           <p>Préparation de la confirmation.</p>
         </div>
       </div>
