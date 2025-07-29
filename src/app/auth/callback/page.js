@@ -48,25 +48,22 @@ function CallbackContent() {
 
   const handleAuthCallback = async () => {
     try {
-      // Récupérer les paramètres de l'URL
+      // Récupérer tous les paramètres de l'URL
       const token = searchParams.get('token');
       const type = searchParams.get('type');
+      const access_token = searchParams.get('access_token');
+      const refresh_token = searchParams.get('refresh_token');
       
-      console.log('Token:', token, 'Type:', type); // Debug
+      console.log('URL params:', { token, type, access_token, refresh_token });
 
-      if (token && type === 'signup') {
-        // Confirmation avec le token
-        const { data, error } = await supabase.auth.verifyOtp({
-          token_hash: token,
-          type: 'email'
+      // Méthode 1: Si on a les tokens d'accès
+      if (access_token && refresh_token) {
+        const { data, error } = await supabase.auth.setSession({
+          access_token,
+          refresh_token
         });
         
-        console.log('Verify result:', data, error); // Debug
-        
-        if (error) {
-          console.error('Token verification error:', error);
-          throw error;
-        }
+        if (error) throw error;
         
         if (data.user) {
           const userInfo = await detectUserType(data.user.id);
@@ -85,7 +82,59 @@ function CallbackContent() {
         }
       }
 
-      // Si pas de token ou échec, vérifier la session actuelle
+      // Méthode 2: Avec le token hash
+      if (token && type) {
+        console.log('Trying token verification...');
+        
+        const { data, error } = await supabase.auth.verifyOtp({
+          token_hash: token,
+          type: type === 'signup' ? 'signup' : 'email'
+        });
+        
+        console.log('Verify result:', data, error);
+        
+        if (error) {
+          // Essayer avec type 'magiclink'
+          const { data: data2, error: error2 } = await supabase.auth.verifyOtp({
+            token_hash: token,
+            type: 'magiclink'
+          });
+          
+          if (error2) throw error2;
+          
+          if (data2.user) {
+            const userInfo = await detectUserType(data2.user.id);
+            setUserType(userInfo.type);
+            setStatus('success');
+            setMessage('Votre compte a été confirmé avec succès.');
+
+            setTimeout(() => {
+              if (userInfo.type === 'restaurant') {
+                router.push('/dashboard');
+              } else {
+                router.push('/');
+              }
+            }, 3000);
+            return;
+          }
+        } else if (data.user) {
+          const userInfo = await detectUserType(data.user.id);
+          setUserType(userInfo.type);
+          setStatus('success');
+          setMessage('Votre compte a été confirmé avec succès.');
+
+          setTimeout(() => {
+            if (userInfo.type === 'restaurant') {
+              router.push('/dashboard');
+            } else {
+              router.push('/');
+            }
+          }, 3000);
+          return;
+        }
+      }
+
+      // Méthode 3: Vérifier si déjà connecté
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError) throw sessionError;
