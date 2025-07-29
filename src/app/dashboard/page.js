@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { QrCode, Users, TrendingUp, Settings, LogOut, Menu, Plus, Download, ExternalLink } from 'lucide-react';
 import './dashboard.css';
 
@@ -10,10 +10,20 @@ export default function Dashboard() {
   const [user, setUser] = useState(null);
   const [restaurant, setRestaurant] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showWelcome, setShowWelcome] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     checkAuth();
+    
+    // Vérifier si c'est une redirection après confirmation
+    const type = searchParams.get('type');
+    if (type === 'signup') {
+      setShowWelcome(true);
+      // Nettoyer l'URL
+      window.history.replaceState({}, '', '/dashboard');
+    }
   }, []);
 
   const checkAuth = async () => {
@@ -79,6 +89,17 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard">
+      {/* Welcome Banner */}
+      {showWelcome && (
+        <div className="welcome-banner">
+          <div className="welcome-content">
+            <CheckCircle size={24} />
+            <span>Félicitations ! Votre compte a été confirmé avec succès.</span>
+            <button onClick={() => setShowWelcome(false)} className="close-banner">×</button>
+          </div>
+        </div>
+      )}
+
       {/* Sidebar */}
       <aside className="sidebar">
         <div className="sidebar-header">
@@ -254,7 +275,7 @@ export default function Dashboard() {
             </div>
             <div className="info-item">
               <strong>URL Menu:</strong> 
-              <span className="menu-url">{`${window.location.origin}/menu/${restaurant?.id}`}</span>
+              <span className="menu-url">{typeof window !== 'undefined' ? `${window.location.origin}/menu/${restaurant?.id}` : ''}</span>
             </div>
           </div>
         </div>
