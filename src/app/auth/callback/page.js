@@ -48,15 +48,53 @@ function CallbackContent() {
 
   const handleAuthCallback = async () => {
     try {
-      const { data, error } = await supabase.auth.getSession();
+      // Récupérer les paramètres de l'URL
+      const token = searchParams.get('token');
+      const type = searchParams.get('type');
       
-      if (error) throw error;
+      console.log('Token:', token, 'Type:', type); // Debug
 
-      if (data.session) {
-        const userInfo = await detectUserType(data.session.user.id);
+      if (token && type === 'signup') {
+        // Confirmation avec le token
+        const { data, error } = await supabase.auth.verifyOtp({
+          token_hash: token,
+          type: 'email'
+        });
+        
+        console.log('Verify result:', data, error); // Debug
+        
+        if (error) {
+          console.error('Token verification error:', error);
+          throw error;
+        }
+        
+        if (data.user) {
+          const userInfo = await detectUserType(data.user.id);
+          setUserType(userInfo.type);
+          setStatus('success');
+          setMessage('Votre compte a été confirmé avec succès.');
+
+          setTimeout(() => {
+            if (userInfo.type === 'restaurant') {
+              router.push('/dashboard');
+            } else {
+              router.push('/');
+            }
+          }, 3000);
+          return;
+        }
+      }
+
+      // Si pas de token ou échec, vérifier la session actuelle
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) throw sessionError;
+
+      if (sessionData.session) {
+        const userInfo = await detectUserType(sessionData.session.user.id);
         setUserType(userInfo.type);
         setStatus('success');
-        setMessage('Votre compte a été confirmé avec succès.');
+        setMessage('Vous êtes déjà connecté.');
 
         setTimeout(() => {
           if (userInfo.type === 'restaurant') {
@@ -64,12 +102,13 @@ function CallbackContent() {
           } else {
             router.push('/');
           }
-        }, 3000);
+        }, 2000);
       } else {
         setStatus('error');
         setMessage('Lien de confirmation invalide ou expiré.');
       }
     } catch (error) {
+      console.error('Callback error:', error);
       setStatus('error');
       setMessage('Erreur lors de la confirmation : ' + error.message);
     }
