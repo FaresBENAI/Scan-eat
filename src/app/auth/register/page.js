@@ -4,11 +4,13 @@ import { useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import QRCode from 'qrcode';
+import { QrCode, User, Building2, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import './register.css';
 
 export default function Register() {
   const [activeTab, setActiveTab] = useState('restaurant');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   // Restaurant form data
   const [restaurantData, setRestaurantData] = useState({
@@ -38,6 +40,7 @@ export default function Register() {
       ...restaurantData,
       [e.target.name]: e.target.value
     });
+    if (error) setError('');
   };
 
   const handleClientChange = (e) => {
@@ -45,12 +48,14 @@ export default function Register() {
       ...clientData,
       [e.target.name]: e.target.value
     });
+    if (error) setError('');
   };
 
   const generateQRCode = async (restaurantId) => {
     try {
       const menuUrl = `${window.location.origin}/menu/${restaurantId}`;
-      const qrCodeDataUrl = await QRCode.toDataURL(menuUrl, {
+      const QRCode = await import('qrcode');
+      const qrCodeDataUrl = await QRCode.default.toDataURL(menuUrl, {
         width: 300,
         margin: 2,
         color: {
@@ -65,19 +70,30 @@ export default function Register() {
     }
   };
 
+  const validateForm = (data, isRestaurant) => {
+    if (data.password !== data.confirmPassword) {
+      return 'Les mots de passe ne correspondent pas';
+    }
+    if (data.password.length < 6) {
+      return 'Le mot de passe doit contenir au moins 6 caractères';
+    }
+    if (isRestaurant && !data.restaurantName.trim()) {
+      return 'Le nom du restaurant est requis';
+    }
+    if (!isRestaurant && !data.name.trim()) {
+      return 'Le nom est requis';
+    }
+    return null;
+  };
+
   const handleRestaurantRegister = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
-    if (restaurantData.password !== restaurantData.confirmPassword) {
-      setError('Les mots de passe ne correspondent pas');
-      setLoading(false);
-      return;
-    }
-
-    if (restaurantData.password.length < 6) {
-      setError('Le mot de passe doit contenir au moins 6 caractères');
+    const validationError = validateForm(restaurantData, true);
+    if (validationError) {
+      setError(validationError);
       setLoading(false);
       return;
     }
@@ -126,14 +142,9 @@ export default function Register() {
     setLoading(true);
     setError('');
 
-    if (clientData.password !== clientData.confirmPassword) {
-      setError('Les mots de passe ne correspondent pas');
-      setLoading(false);
-      return;
-    }
-
-    if (clientData.password.length < 6) {
-      setError('Le mot de passe doit contenir au moins 6 caractères');
+    const validationError = validateForm(clientData, false);
+    if (validationError) {
+      setError(validationError);
       setLoading(false);
       return;
     }
@@ -170,49 +181,56 @@ export default function Register() {
     setLoading(false);
   };
 
+  const currentData = activeTab === 'restaurant' ? restaurantData : clientData;
+
   return (
-    <div className="auth-container">
-      <div className="auth-card register-card">
-        <div className="auth-header">
-          <h1>Créer votre compte Scan-eat</h1>
-          <p>Choisissez votre type de compte</p>
+    <div className="register-container">
+      {/* Back button */}
+      <Link href="/" className="back-btn">
+        <ArrowLeft size={20} />
+        <span>Retour à l'accueil</span>
+      </Link>
+
+      <div className="register-card">
+        <div className="register-header">
+          <div className="logo">
+            <QrCode size={32} />
+            <span>Scan-eat</span>
+          </div>
+          <h1>Créer votre compte</h1>
+          <p>Choisissez votre type de compte pour commencer</p>
         </div>
 
         {/* Tabs */}
         <div className="tabs">
           <button 
             className={`tab ${activeTab === 'restaurant' ? 'active' : ''}`}
-            onClick={() => setActiveTab('restaurant')}
+            onClick={() => {
+              setActiveTab('restaurant');
+              setError('');
+            }}
           >
-            Restaurant
+            <Building2 size={20} />
+            <span>Restaurant</span>
           </button>
           <button 
             className={`tab ${activeTab === 'client' ? 'active' : ''}`}
-            onClick={() => setActiveTab('client')}
+            onClick={() => {
+              setActiveTab('client');
+              setError('');
+            }}
           >
-            Client
+            <User size={20} />
+            <span>Client</span>
           </button>
         </div>
 
         {/* Restaurant Form */}
         {activeTab === 'restaurant' && (
-          <form onSubmit={handleRestaurantRegister} className="auth-form">
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="email">Email *</label>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  value={restaurantData.email}
-                  onChange={handleRestaurantChange}
-                  required
-                  placeholder="votre@email.com"
-                />
-              </div>
-            </div>
-
-            <div className="form-row">
+          <form onSubmit={handleRestaurantRegister} className="register-form">
+            <div className="form-section">
+              <h3>Informations du restaurant</h3>
+              
               <div className="form-group">
                 <label htmlFor="restaurantName">Nom du restaurant *</label>
                 <input
@@ -223,25 +241,24 @@ export default function Register() {
                   onChange={handleRestaurantChange}
                   required
                   placeholder="Le Petit Bistrot"
+                  className={error && !restaurantData.restaurantName ? 'error' : ''}
                 />
               </div>
-            </div>
 
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="phone">Téléphone</label>
-                <input
-                  id="phone"
-                  name="phone"
-                  type="tel"
-                  value={restaurantData.phone}
-                  onChange={handleRestaurantChange}
-                  placeholder="+33 1 23 45 67 89"
-                />
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="phone">Téléphone</label>
+                  <input
+                    id="phone"
+                    name="phone"
+                    type="tel"
+                    value={restaurantData.phone}
+                    onChange={handleRestaurantChange}
+                    placeholder="+33 1 23 45 67 89"
+                  />
+                </div>
               </div>
-            </div>
 
-            <div className="form-row">
               <div className="form-group">
                 <label htmlFor="address">Adresse</label>
                 <input
@@ -255,52 +272,94 @@ export default function Register() {
               </div>
             </div>
 
-            <div className="form-row">
+            <div className="form-section">
+              <h3>Compte d'accès</h3>
+              
               <div className="form-group">
-                <label htmlFor="password">Mot de passe *</label>
+                <label htmlFor="email">Email *</label>
                 <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  value={restaurantData.password}
+                  id="email"
+                  name="email"
+                  type="email"
+                  value={restaurantData.email}
                   onChange={handleRestaurantChange}
                   required
-                  placeholder="••••••••"
+                  placeholder="votre@email.com"
+                  className={error && !restaurantData.email ? 'error' : ''}
                 />
               </div>
-            </div>
 
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="confirmPassword">Confirmer le mot de passe *</label>
-                <input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type="password"
-                  value={restaurantData.confirmPassword}
-                  onChange={handleRestaurantChange}
-                  required
-                  placeholder="••••••••"
-                />
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="password">Mot de passe *</label>
+                  <div className="password-input">
+                    <input
+                      id="password"
+                      name="password"
+                      type={showPassword ? 'text' : 'password'}
+                      value={restaurantData.password}
+                      onChange={handleRestaurantChange}
+                      required
+                      placeholder="••••••••"
+                      className={error && restaurantData.password.length < 6 ? 'error' : ''}
+                    />
+                    <button
+                      type="button"
+                      className="password-toggle"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="confirmPassword">Confirmer *</label>
+                  <div className="password-input">
+                    <input
+                      id="confirmPassword"
+                      name="confirmPassword"
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={restaurantData.confirmPassword}
+                      onChange={handleRestaurantChange}
+                      required
+                      placeholder="••••••••"
+                      className={error && restaurantData.password !== restaurantData.confirmPassword ? 'error' : ''}
+                    />
+                    <button
+                      type="button"
+                      className="password-toggle"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    >
+                      {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
             {error && <div className="error-message">{error}</div>}
 
-            <button type="submit" disabled={loading} className="auth-button">
-              {loading ? 'Création du compte...' : 'Créer mon restaurant'}
+            <button type="submit" disabled={loading} className="submit-btn">
+              {loading ? (
+                <div className="loading-spinner"></div>
+              ) : (
+                'Créer mon restaurant'
+              )}
             </button>
 
-            <div className="qr-info">
-              <p><small>Votre QR code sera généré automatiquement</small></p>
+            <div className="form-info">
+              <p>Votre QR code sera généré automatiquement</p>
             </div>
           </form>
         )}
 
         {/* Client Form */}
         {activeTab === 'client' && (
-          <form onSubmit={handleClientRegister} className="auth-form">
-            <div className="form-row">
+          <form onSubmit={handleClientRegister} className="register-form">
+            <div className="form-section">
+              <h3>Informations personnelles</h3>
+              
               <div className="form-group">
                 <label htmlFor="clientName">Nom complet *</label>
                 <input
@@ -311,26 +370,10 @@ export default function Register() {
                   onChange={handleClientChange}
                   required
                   placeholder="Jean Dupont"
+                  className={error && !clientData.name ? 'error' : ''}
                 />
               </div>
-            </div>
 
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="clientEmail">Email *</label>
-                <input
-                  id="clientEmail"
-                  name="email"
-                  type="email"
-                  value={clientData.email}
-                  onChange={handleClientChange}
-                  required
-                  placeholder="jean@email.com"
-                />
-              </div>
-            </div>
-
-            <div className="form-row">
               <div className="form-group">
                 <label htmlFor="clientPhone">Téléphone</label>
                 <input
@@ -344,53 +387,92 @@ export default function Register() {
               </div>
             </div>
 
-            <div className="form-row">
+            <div className="form-section">
+              <h3>Compte d'accès</h3>
+              
               <div className="form-group">
-                <label htmlFor="clientPassword">Mot de passe *</label>
+                <label htmlFor="clientEmail">Email *</label>
                 <input
-                  id="clientPassword"
-                  name="password"
-                  type="password"
-                  value={clientData.password}
+                  id="clientEmail"
+                  name="email"
+                  type="email"
+                  value={clientData.email}
                   onChange={handleClientChange}
                   required
-                  placeholder="••••••••"
+                  placeholder="jean@email.com"
+                  className={error && !clientData.email ? 'error' : ''}
                 />
               </div>
-            </div>
 
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="clientConfirmPassword">Confirmer le mot de passe *</label>
-                <input
-                  id="clientConfirmPassword"
-                  name="confirmPassword"
-                  type="password"
-                  value={clientData.confirmPassword}
-                  onChange={handleClientChange}
-                  required
-                  placeholder="••••••••"
-                />
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="clientPassword">Mot de passe *</label>
+                  <div className="password-input">
+                    <input
+                      id="clientPassword"
+                      name="password"
+                      type={showPassword ? 'text' : 'password'}
+                      value={clientData.password}
+                      onChange={handleClientChange}
+                      required
+                      placeholder="••••••••"
+                      className={error && clientData.password.length < 6 ? 'error' : ''}
+                    />
+                    <button
+                      type="button"
+                      className="password-toggle"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="clientConfirmPassword">Confirmer *</label>
+                  <div className="password-input">
+                    <input
+                      id="clientConfirmPassword"
+                      name="confirmPassword"
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={clientData.confirmPassword}
+                      onChange={handleClientChange}
+                      required
+                      placeholder="••••••••"
+                      className={error && clientData.password !== clientData.confirmPassword ? 'error' : ''}
+                    />
+                    <button
+                      type="button"
+                      className="password-toggle"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    >
+                      {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
             {error && <div className="error-message">{error}</div>}
 
-            <button type="submit" disabled={loading} className="auth-button">
-              {loading ? 'Création du compte...' : 'Créer mon compte client'}
+            <button type="submit" disabled={loading} className="submit-btn">
+              {loading ? (
+                <div className="loading-spinner"></div>
+              ) : (
+                'Créer mon compte client'
+              )}
             </button>
 
-            <div className="client-info">
-              <p><small>Accédez à l'historique de vos commandes et au suivi en temps réel</small></p>
+            <div className="form-info">
+              <p>Accédez à l'historique de vos commandes et au suivi en temps réel</p>
             </div>
           </form>
         )}
 
-        <div className="auth-footer">
+        <div className="register-footer">
           <p>Vous avez déjà un compte ?{' '}
             <Link href="/auth/login">Se connecter</Link>
           </p>
-          <Link href="/" className="back-home">← Retour à l'accueil</Link>
         </div>
       </div>
     </div>
