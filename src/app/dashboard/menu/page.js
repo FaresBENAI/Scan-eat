@@ -21,6 +21,7 @@ export default function MenuManagement() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [draggedItem, setDraggedItem] = useState(null);
+  const [saving, setSaving] = useState(false);
   const router = useRouter();
 
   // Form states
@@ -34,7 +35,7 @@ export default function MenuManagement() {
     description: '',
     price: '',
     category_id: '',
-    available: true,
+    is_available: true,
     customizable: false,
     image_url: null,
     display_order: 0
@@ -80,53 +81,27 @@ export default function MenuManagement() {
 
   const loadMenuData = async (restaurantId) => {
     try {
-      const mockCategories = [
-        { id: 1, restaurant_id: restaurantId, name: 'Entrées', display_order: 1 },
-        { id: 2, restaurant_id: restaurantId, name: 'Plats principaux', display_order: 2 },
-        { id: 3, restaurant_id: restaurantId, name: 'Desserts', display_order: 3 },
-        { id: 4, restaurant_id: restaurantId, name: 'Boissons', display_order: 4 }
-      ];
-      setCategories(mockCategories);
+      // Charger les catégories
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('restaurant_id', restaurantId)
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
 
-      const mockMenuItems = [
-        {
-          id: 1,
-          restaurant_id: restaurantId,
-          category_id: 1,
-          name: 'Salade César',
-          description: 'Salade romaine, croûtons, parmesan, sauce césar maison',
-          price: 12.50,
-          image_url: null,
-          available: true,
-          customizable: true,
-          display_order: 1
-        },
-        {
-          id: 2,
-          restaurant_id: restaurantId,
-          category_id: 2,
-          name: 'Burger Classique',
-          description: 'Pain brioche, steak haché, salade, tomate, oignon, sauce burger',
-          price: 15.90,
-          image_url: null,
-          available: true,
-          customizable: false,
-          display_order: 1
-        },
-        {
-          id: 3,
-          restaurant_id: restaurantId,
-          category_id: 3,
-          name: 'Tiramisu',
-          description: 'Dessert italien traditionnel au café et mascarpone',
-          price: 7.50,
-          image_url: null,
-          available: true,
-          customizable: false,
-          display_order: 1
-        }
-      ];
-      setMenuItems(mockMenuItems);
+      if (categoriesError) throw categoriesError;
+      setCategories(categoriesData || []);
+
+      // Charger les plats
+      const { data: itemsData, error: itemsError } = await supabase
+        .from('menu_items')
+        .select('*')
+        .eq('restaurant_id', restaurantId)
+        .order('display_order', { ascending: true });
+
+      if (itemsError) throw itemsError;
+      setMenuItems(itemsData || []);
+
     } catch (error) {
       console.error('Erreur chargement menu:', error);
       setError('Erreur lors du chargement du menu');
@@ -144,38 +119,49 @@ export default function MenuManagement() {
     e.dataTransfer.dropEffect = 'move';
   };
 
-  const handleDrop = (e, targetItem) => {
+  const handleDrop = async (e, targetItem) => {
     e.preventDefault();
     
     if (!draggedItem || draggedItem.id === targetItem.id) return;
 
     // Réorganiser les items dans la même catégorie
     if (draggedItem.category_id === targetItem.category_id) {
-      const categoryItems = menuItems
-        .filter(item => item.category_id === draggedItem.category_id)
-        .sort((a, b) => a.display_order - b.display_order);
+      try {
+        const categoryItems = menuItems
+          .filter(item => item.category_id === draggedItem.category_id)
+          .sort((a, b) => a.display_order - b.display_order);
 
-      const draggedIndex = categoryItems.findIndex(item => item.id === draggedItem.id);
-      const targetIndex = categoryItems.findIndex(item => item.id === targetItem.id);
+        const draggedIndex = categoryItems.findIndex(item => item.id === draggedItem.id);
+        const targetIndex = categoryItems.findIndex(item => item.id === targetItem.id);
 
-      // Réorganiser l'ordre
-      const newItems = [...categoryItems];
-      const [removed] = newItems.splice(draggedIndex, 1);
-      newItems.splice(targetIndex, 0, removed);
+        // Réorganiser l'ordre
+        const newItems = [...categoryItems];
+        const [removed] = newItems.splice(draggedIndex, 1);
+        newItems.splice(targetIndex, 0, removed);
 
-      // Mettre à jour les display_order
-      const updatedItems = newItems.map((item, index) => ({
-        ...item,
-        display_order: index + 1
-      }));
+        // Mettre à jour les display_order dans la BDD
+        const updates = newItems.map((item, index) => ({
+          id: item.id,
+          display_order: index + 1
+        }));
 
-      // Mettre à jour l'état
-      setMenuItems(prev => [
-        ...prev.filter(item => item.category_id !== draggedItem.category_id),
-        ...updatedItems
-      ]);
+        for (const update of updates) {
+          const { error } = await supabase
+            .from('menu_items')
+            .update({ display_order: update.display_order })
+            .eq('id', update.id);
 
-      setSuccess('Ordre des plats mis à jour');
+          if (error) throw error;
+        }
+
+        // Recharger les données
+        await loadMenuData(restaurant.id);
+        setSuccess('Ordre des plats mis à jour');
+
+      } catch (error) {
+        console.error('Erreur réorganisation:', error);
+        setError('Erreur lors de la réorganisation');
+      }
     }
 
     setDraggedItem(null);
@@ -205,29 +191,41 @@ export default function MenuManagement() {
       return;
     }
 
+    setSaving(true);
     try {
       if (editingCategory) {
-        setCategories(prev => prev.map(cat => 
-          cat.id === editingCategory.id 
-            ? { ...cat, ...categoryForm }
-            : cat
-        ));
+        // Modifier la catégorie existante
+        const { error } = await supabase
+          .from('categories')
+          .update(categoryForm)
+          .eq('id', editingCategory.id);
+
+        if (error) throw error;
         setSuccess('Catégorie modifiée avec succès');
       } else {
-        const newCategory = {
-          id: Date.now(),
-          restaurant_id: restaurant.id,
-          ...categoryForm
-        };
-        setCategories(prev => [...prev, newCategory]);
+        // Ajouter nouvelle catégorie
+        const { error } = await supabase
+          .from('categories')
+          .insert([{
+            restaurant_id: restaurant.id,
+            ...categoryForm
+          }]);
+
+        if (error) throw error;
         setSuccess('Catégorie ajoutée avec succès');
       }
       
       setShowCategoryModal(false);
       setEditingCategory(null);
       setCategoryForm({ name: '', display_order: 0 });
+      
+      // Recharger les données
+      await loadMenuData(restaurant.id);
     } catch (error) {
+      console.error('Erreur sauvegarde catégorie:', error);
       setError('Erreur lors de la sauvegarde');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -237,10 +235,26 @@ export default function MenuManagement() {
     }
 
     try {
-      setCategories(prev => prev.filter(cat => cat.id !== categoryId));
-      setMenuItems(prev => prev.filter(item => item.category_id !== categoryId));
+      // Supprimer d'abord les plats de la catégorie
+      const { error: itemsError } = await supabase
+        .from('menu_items')
+        .delete()
+        .eq('category_id', categoryId);
+
+      if (itemsError) throw itemsError;
+
+      // Puis supprimer la catégorie
+      const { error: categoryError } = await supabase
+        .from('categories')
+        .delete()
+        .eq('id', categoryId);
+
+      if (categoryError) throw categoryError;
+
       setSuccess('Catégorie supprimée avec succès');
+      await loadMenuData(restaurant.id);
     } catch (error) {
+      console.error('Erreur suppression catégorie:', error);
       setError('Erreur lors de la suppression');
     }
   };
@@ -251,10 +265,10 @@ export default function MenuManagement() {
       setEditingItem(item);
       setItemForm({
         name: item.name,
-        description: item.description,
+        description: item.description || '',
         price: item.price.toString(),
         category_id: item.category_id,
-        available: item.available,
+        is_available: item.is_available,
         customizable: item.customizable || false,
         image_url: item.image_url,
         display_order: item.display_order
@@ -262,15 +276,16 @@ export default function MenuManagement() {
       setImagePreview(item.image_url);
     } else {
       setEditingItem(null);
+      const categoryItems = menuItems.filter(item => item.category_id === categoryId);
       setItemForm({
         name: '',
         description: '',
         price: '',
         category_id: categoryId || (categories[0]?.id || ''),
-        available: true,
+        is_available: true,
         customizable: false,
         image_url: null,
-        display_order: menuItems.filter(item => item.category_id === categoryId).length + 1
+        display_order: categoryItems.length + 1
       });
       setImagePreview(null);
     }
@@ -298,6 +313,9 @@ export default function MenuManagement() {
 
     try {
       setUploadingImage(true);
+      
+      // TODO: Implémenter Supabase Storage
+      // Pour l'instant, simulation
       await new Promise(resolve => setTimeout(resolve, 1500));
       const imageUrl = URL.createObjectURL(imageFile);
       return imageUrl;
@@ -320,6 +338,7 @@ export default function MenuManagement() {
       return;
     }
 
+    setSaving(true);
     try {
       let imageUrl = itemForm.image_url;
       
@@ -328,25 +347,35 @@ export default function MenuManagement() {
       }
 
       const itemData = {
-        ...itemForm,
+        name: itemForm.name,
+        description: itemForm.description || null,
         price: parseFloat(itemForm.price),
-        image_url: imageUrl
+        category_id: itemForm.category_id,
+        is_available: itemForm.is_available,
+        customizable: itemForm.customizable,
+        image_url: imageUrl,
+        display_order: itemForm.display_order
       };
 
       if (editingItem) {
-        setMenuItems(prev => prev.map(item => 
-          item.id === editingItem.id 
-            ? { ...item, ...itemData }
-            : item
-        ));
+        // Modifier le plat existant
+        const { error } = await supabase
+          .from('menu_items')
+          .update(itemData)
+          .eq('id', editingItem.id);
+
+        if (error) throw error;
         setSuccess('Plat modifié avec succès');
       } else {
-        const newItem = {
-          id: Date.now(),
-          restaurant_id: restaurant.id,
-          ...itemData
-        };
-        setMenuItems(prev => [...prev, newItem]);
+        // Ajouter nouveau plat
+        const { error } = await supabase
+          .from('menu_items')
+          .insert([{
+            restaurant_id: restaurant.id,
+            ...itemData
+          }]);
+
+        if (error) throw error;
         setSuccess('Plat ajouté avec succès');
       }
       
@@ -357,15 +386,21 @@ export default function MenuManagement() {
         description: '',
         price: '',
         category_id: '',
-        available: true,
+        is_available: true,
         customizable: false,
         image_url: null,
         display_order: 0
       });
       setImageFile(null);
       setImagePreview(null);
+      
+      // Recharger les données
+      await loadMenuData(restaurant.id);
     } catch (error) {
+      console.error('Erreur sauvegarde plat:', error);
       setError('Erreur lors de la sauvegarde');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -375,21 +410,34 @@ export default function MenuManagement() {
     }
 
     try {
-      setMenuItems(prev => prev.filter(item => item.id !== itemId));
+      const { error } = await supabase
+        .from('menu_items')
+        .delete()
+        .eq('id', itemId);
+
+      if (error) throw error;
+
       setSuccess('Plat supprimé avec succès');
+      await loadMenuData(restaurant.id);
     } catch (error) {
+      console.error('Erreur suppression plat:', error);
       setError('Erreur lors de la suppression');
     }
   };
 
   const toggleItemAvailability = async (itemId) => {
     try {
-      setMenuItems(prev => prev.map(item => 
-        item.id === itemId 
-          ? { ...item, available: !item.available }
-          : item
-      ));
+      const item = menuItems.find(i => i.id === itemId);
+      const { error } = await supabase
+        .from('menu_items')
+        .update({ is_available: !item.is_available })
+        .eq('id', itemId);
+
+      if (error) throw error;
+
+      await loadMenuData(restaurant.id);
     } catch (error) {
+      console.error('Erreur toggle disponibilité:', error);
       setError('Erreur lors de la modification');
     }
   };
@@ -411,7 +459,7 @@ export default function MenuManagement() {
       const timer = setTimeout(() => {
         setError('');
         setSuccess('');
-      }, 3000);
+      }, 4000);
       return () => clearTimeout(timer);
     }
   }, [error, success]);
@@ -449,6 +497,7 @@ export default function MenuManagement() {
             <button 
               onClick={() => openCategoryModal()}
               className="btn-secondary"
+              disabled={saving}
             >
               <Plus size={20} />
               <span>Nouvelle catégorie</span>
@@ -481,6 +530,7 @@ export default function MenuManagement() {
             <button 
               onClick={() => openCategoryModal()}
               className="btn-primary"
+              disabled={saving}
             >
               <Plus size={20} />
               Créer une catégorie
@@ -504,6 +554,7 @@ export default function MenuManagement() {
                       onClick={() => openItemModal(null, category.id)}
                       className="btn-add-item"
                       title="Ajouter un plat"
+                      disabled={saving}
                     >
                       <Plus size={18} />
                     </button>
@@ -511,6 +562,7 @@ export default function MenuManagement() {
                       onClick={() => openCategoryModal(category)}
                       className="btn-edit"
                       title="Modifier la catégorie"
+                      disabled={saving}
                     >
                       <Edit3 size={18} />
                     </button>
@@ -518,6 +570,7 @@ export default function MenuManagement() {
                       onClick={() => deleteCategory(category.id)}
                       className="btn-delete"
                       title="Supprimer la catégorie"
+                      disabled={saving}
                     >
                       <Trash2 size={18} />
                     </button>
@@ -529,7 +582,7 @@ export default function MenuManagement() {
                   {getItemsByCategory(category.id).map(item => (
                     <div 
                       key={item.id} 
-                      className={`item-row ${!item.available ? 'unavailable' : ''} ${draggedItem?.id === item.id ? 'dragging' : ''}`}
+                      className={`item-row ${!item.is_available ? 'unavailable' : ''} ${draggedItem?.id === item.id ? 'dragging' : ''}`}
                       draggable
                       onDragStart={(e) => handleDragStart(e, item)}
                       onDragOver={handleDragOver}
@@ -559,8 +612,8 @@ export default function MenuManagement() {
                             {item.customizable && (
                               <span className="badge customizable">Personnalisable</span>
                             )}
-                            <span className={`badge availability ${item.available ? 'available' : 'unavailable'}`}>
-                              {item.available ? 'Disponible' : 'Indisponible'}
+                            <span className={`badge availability ${item.is_available ? 'available' : 'unavailable'}`}>
+                              {item.is_available ? 'Disponible' : 'Indisponible'}
                             </span>
                           </div>
                         </div>
@@ -568,7 +621,7 @@ export default function MenuManagement() {
                         <p className="item-description">{item.description}</p>
                         
                         <div className="item-footer">
-                          <div className="item-price">{item.price.toFixed(2)}€</div>
+                          <div className="item-price">{parseFloat(item.price).toFixed(2)}€</div>
                           <div className="item-order">Ordre: {item.display_order}</div>
                         </div>
                       </div>
@@ -577,15 +630,17 @@ export default function MenuManagement() {
                       <div className="item-actions">
                         <button 
                           onClick={() => toggleItemAvailability(item.id)}
-                          className={`availability-toggle ${item.available ? 'available' : 'unavailable'}`}
-                          title={item.available ? 'Marquer indisponible' : 'Marquer disponible'}
+                          className={`availability-toggle ${item.is_available ? 'available' : 'unavailable'}`}
+                          title={item.is_available ? 'Marquer indisponible' : 'Marquer disponible'}
+                          disabled={saving}
                         >
-                          {item.available ? <Eye size={16} /> : <EyeOff size={16} />}
+                          {item.is_available ? <Eye size={16} /> : <EyeOff size={16} />}
                         </button>
                         <button 
                           onClick={() => openItemModal(item)}
                           className="btn-edit"
                           title="Modifier"
+                          disabled={saving}
                         >
                           <Edit3 size={16} />
                         </button>
@@ -593,6 +648,7 @@ export default function MenuManagement() {
                           onClick={() => deleteItem(item.id)}
                           className="btn-delete"
                           title="Supprimer"
+                          disabled={saving}
                         >
                           <Trash2 size={16} />
                         </button>
@@ -605,6 +661,7 @@ export default function MenuManagement() {
                     <button 
                       onClick={() => openItemModal(null, category.id)}
                       className="add-item-btn-inline"
+                      disabled={saving}
                     >
                       <Plus size={20} />
                       <span>Ajouter un plat à "{category.name}"</span>
@@ -617,15 +674,16 @@ export default function MenuManagement() {
         )}
       </main>
 
-      {/* Modal Catégorie - inchangé */}
+      {/* Modal Catégorie */}
       {showCategoryModal && (
-        <div className="modal-overlay" onClick={() => setShowCategoryModal(false)}>
+        <div className="modal-overlay" onClick={() => !saving && setShowCategoryModal(false)}>
           <div className="modal category-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{editingCategory ? 'Modifier la catégorie' : 'Nouvelle catégorie'}</h2>
               <button 
                 onClick={() => setShowCategoryModal(false)}
                 className="close-btn"
+                disabled={saving}
               >
                 <X size={24} />
               </button>
@@ -641,6 +699,7 @@ export default function MenuManagement() {
                   onChange={(e) => setCategoryForm(prev => ({ ...prev, name: e.target.value }))}
                   placeholder="Ex: Entrées, Plats principaux..."
                   autoFocus
+                  disabled={saving}
                 />
               </div>
               
@@ -652,6 +711,7 @@ export default function MenuManagement() {
                   value={categoryForm.display_order}
                   onChange={(e) => setCategoryForm(prev => ({ ...prev, display_order: parseInt(e.target.value) || 0 }))}
                   min="1"
+                  disabled={saving}
                 />
               </div>
             </div>
@@ -660,14 +720,20 @@ export default function MenuManagement() {
               <button 
                 onClick={() => setShowCategoryModal(false)}
                 className="btn-secondary"
+                disabled={saving}
               >
                 Annuler
               </button>
               <button 
                 onClick={saveCategoryForm}
                 className="btn-primary"
+                disabled={saving}
               >
-                <Save size={20} />
+                {saving ? (
+                  <div className="loading-spinner small"></div>
+                ) : (
+                  <Save size={20} />
+                )}
                 {editingCategory ? 'Modifier' : 'Créer'}
               </button>
             </div>
@@ -677,13 +743,14 @@ export default function MenuManagement() {
 
       {/* Modal Plat avec option Personnalisable */}
       {showItemModal && (
-        <div className="modal-overlay" onClick={() => setShowItemModal(false)}>
+        <div className="modal-overlay" onClick={() => !saving && setShowItemModal(false)}>
           <div className="modal item-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{editingItem ? 'Modifier le plat' : 'Nouveau plat'}</h2>
               <button 
                 onClick={() => setShowItemModal(false)}
                 className="close-btn"
+                disabled={saving}
               >
                 <X size={24} />
               </button>
@@ -699,6 +766,7 @@ export default function MenuManagement() {
                     value={itemForm.name}
                     onChange={(e) => setItemForm(prev => ({ ...prev, name: e.target.value }))}
                     placeholder="Ex: Salade César"
+                    disabled={saving}
                   />
                 </div>
                 
@@ -712,6 +780,7 @@ export default function MenuManagement() {
                     value={itemForm.price}
                     onChange={(e) => setItemForm(prev => ({ ...prev, price: e.target.value }))}
                     placeholder="12.50"
+                    disabled={saving}
                   />
                 </div>
               </div>
@@ -721,7 +790,8 @@ export default function MenuManagement() {
                 <select
                   id="itemCategory"
                   value={itemForm.category_id}
-                  onChange={(e) => setItemForm(prev => ({ ...prev, category_id: parseInt(e.target.value) }))}
+                  onChange={(e) => setItemForm(prev => ({ ...prev, category_id: e.target.value }))}
+                  disabled={saving}
                 >
                   {categories.map(category => (
                     <option key={category.id} value={category.id}>
@@ -739,6 +809,7 @@ export default function MenuManagement() {
                   onChange={(e) => setItemForm(prev => ({ ...prev, description: e.target.value }))}
                   placeholder="Décrivez les ingrédients et la préparation..."
                   rows="3"
+                  disabled={saving}
                 />
               </div>
               
@@ -751,8 +822,9 @@ export default function MenuManagement() {
                     onChange={handleImageChange}
                     className="image-input"
                     id="imageInput"
+                    disabled={saving}
                   />
-                  <label htmlFor="imageInput" className="image-upload-btn">
+                  <label htmlFor="imageInput" className={`image-upload-btn ${saving ? 'disabled' : ''}`}>
                     <Upload size={20} />
                     <span>Choisir une image</span>
                   </label>
@@ -767,6 +839,7 @@ export default function MenuManagement() {
                           setItemForm(prev => ({ ...prev, image_url: null }));
                         }}
                         className="remove-image"
+                        disabled={saving}
                       >
                         <X size={16} />
                       </button>
@@ -780,8 +853,9 @@ export default function MenuManagement() {
                   <label className="checkbox-label">
                     <input
                       type="checkbox"
-                      checked={itemForm.available}
-                      onChange={(e) => setItemForm(prev => ({ ...prev, available: e.target.checked }))}
+                      checked={itemForm.is_available}
+                      onChange={(e) => setItemForm(prev => ({ ...prev, is_available: e.target.checked }))}
+                      disabled={saving}
                     />
                     <span>Plat disponible</span>
                   </label>
@@ -793,6 +867,7 @@ export default function MenuManagement() {
                       type="checkbox"
                       checked={itemForm.customizable}
                       onChange={(e) => setItemForm(prev => ({ ...prev, customizable: e.target.checked }))}
+                      disabled={saving}
                     />
                     <span>Personnalisable par le client</span>
                   </label>
@@ -805,15 +880,16 @@ export default function MenuManagement() {
               <button 
                 onClick={() => setShowItemModal(false)}
                 className="btn-secondary"
+                disabled={saving}
               >
                 Annuler
               </button>
               <button 
                 onClick={saveItemForm}
                 className="btn-primary"
-                disabled={uploadingImage}
+                disabled={saving || uploadingImage}
               >
-                {uploadingImage ? (
+                {saving || uploadingImage ? (
                   <div className="loading-spinner small"></div>
                 ) : (
                   <Save size={20} />

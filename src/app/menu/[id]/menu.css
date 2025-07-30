@@ -859,3 +859,41 @@
 .cart-items::-webkit-scrollbar-thumb:hover {
   background: rgba(29, 33, 41, 0.3);
 }
+
+/* Badge personnalisable sur les plats */
+.customizable-badge {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: rgba(29, 33, 41, 0.9);
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.item-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.5rem;
+}
+
+.item-category {
+  color: #adb5bd;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.cart-item-customizable {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: #6c757d;
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+}
