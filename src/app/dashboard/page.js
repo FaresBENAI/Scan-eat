@@ -3,7 +3,10 @@
 import { useState, useEffect, Suspense } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { QrCode, Users, TrendingUp, Settings, LogOut, Menu, Plus, Download, ExternalLink, CheckCircle } from 'lucide-react';
+import { 
+  QrCode, Users, TrendingUp, Settings, LogOut, Menu, Plus, Download, 
+  ExternalLink, CheckCircle, X, BarChart3, Clock, Bell, Eye
+} from 'lucide-react';
 import './dashboard.css';
 
 function DashboardContent() {
@@ -11,6 +14,8 @@ function DashboardContent() {
   const [restaurant, setRestaurant] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState('overview');
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -26,6 +31,16 @@ function DashboardContent() {
         window.history.replaceState({}, '', '/dashboard');
       }
     }
+
+    // Fermer sidebar sur mobile lors du changement de route
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) {
+        setSidebarOpen(false);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const checkAuth = async () => {
@@ -59,8 +74,11 @@ function DashboardContent() {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/');
+    const confirmed = window.confirm('Êtes-vous sûr de vouloir vous déconnecter ?');
+    if (confirmed) {
+      await supabase.auth.signOut();
+      router.push('/');
+    }
   };
 
   const downloadQRCode = () => {
@@ -80,11 +98,30 @@ function DashboardContent() {
     }
   };
 
+  const toggleSidebar = () => {
+    setSidebarOpen(!sidebarOpen);
+  };
+
+  const closeSidebar = () => {
+    setSidebarOpen(false);
+  };
+
+  const menuItems = [
+    { id: 'overview', icon: BarChart3, label: 'Vue d\'ensemble', active: true },
+    { id: 'menu', icon: Menu, label: 'Gestion du menu' },
+    { id: 'orders', icon: Clock, label: 'Commandes' },
+    { id: 'customers', icon: Users, label: 'Clients' },
+    { id: 'analytics', icon: TrendingUp, label: 'Statistiques' },
+    { id: 'settings', icon: Settings, label: 'Paramètres' }
+  ];
+
   if (loading) {
     return (
       <div className="dashboard-loading">
-        <div className="loading-spinner"></div>
-        <p>Chargement de votre dashboard...</p>
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <p>Chargement de votre dashboard...</p>
+        </div>
       </div>
     );
   }
@@ -97,35 +134,81 @@ function DashboardContent() {
           <div className="welcome-content">
             <CheckCircle size={24} />
             <span>Félicitations ! Votre compte a été confirmé avec succès.</span>
-            <button onClick={() => setShowWelcome(false)} className="close-banner">×</button>
+            <button 
+              onClick={() => setShowWelcome(false)} 
+              className="close-banner"
+              aria-label="Fermer la bannière"
+            >
+              <X size={20} />
+            </button>
           </div>
         </div>
       )}
 
+      {/* Mobile Header */}
+      <header className="mobile-header">
+        <button 
+          onClick={toggleSidebar}
+          className="mobile-menu-btn"
+          aria-label="Ouvrir le menu"
+        >
+          <Menu size={24} />
+        </button>
+        <div className="mobile-logo">
+          <QrCode size={24} />
+          <span>Scan-eat</span>
+        </div>
+        <div className="mobile-actions">
+          <button className="notification-btn" aria-label="Notifications">
+            <Bell size={20} />
+            <span className="notification-badge">3</span>
+          </button>
+        </div>
+      </header>
+
+      {/* Sidebar Overlay */}
+      {sidebarOpen && <div className="sidebar-overlay" onClick={closeSidebar}></div>}
+
       {/* Sidebar */}
-      <aside className="sidebar">
+      <aside className={`sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
         <div className="sidebar-header">
-          <QrCode size={32} className="logo-icon" />
-          <h2>Scan-eat</h2>
+          <div className="sidebar-logo">
+            <QrCode size={32} className="logo-icon" />
+            <h2>Scan-eat</h2>
+          </div>
+          <button 
+            onClick={closeSidebar}
+            className="sidebar-close"
+            aria-label="Fermer le menu"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="restaurant-info-sidebar">
+          <div className="restaurant-avatar">
+            {restaurant?.name?.charAt(0) || 'R'}
+          </div>
+          <div className="restaurant-details">
+            <strong>{restaurant?.name || 'Restaurant'}</strong>
+            <span>{restaurant?.email}</span>
+          </div>
         </div>
 
         <nav className="sidebar-nav">
-          <div className="nav-item active">
-            <TrendingUp size={20} />
-            <span>Tableau de bord</span>
-          </div>
-          <div className="nav-item">
-            <Menu size={20} />
-            <span>Menu</span>
-          </div>
-          <div className="nav-item">
-            <Users size={20} />
-            <span>Commandes</span>
-          </div>
-          <div className="nav-item">
-            <Settings size={20} />
-            <span>Paramètres</span>
-          </div>
+          {menuItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => {
+                setActiveSection(item.id);
+                closeSidebar();
+              }}
+              className={`nav-item ${activeSection === item.id ? 'active' : ''}`}
+            >
+              <item.icon size={20} />
+              <span>{item.label}</span>
+            </button>
+          ))}
         </nav>
 
         <div className="sidebar-footer">
@@ -138,149 +221,200 @@ function DashboardContent() {
 
       {/* Main Content */}
       <main className="main-content">
-        {/* Header */}
-        <header className="dashboard-header">
-          <div className="welcome-section">
-            <h1>Bonjour, {restaurant?.name || 'Restaurant'} !</h1>
-            <p>Voici un aperçu de votre activité aujourd'hui</p>
-          </div>
-          <div className="header-actions">
-            <button className="btn-primary">
-              <Plus size={20} />
-              Ajouter un plat
-            </button>
-          </div>
-        </header>
+        {activeSection === 'overview' && (
+          <>
+            {/* Header */}
+            <header className="dashboard-header">
+              <div className="welcome-section">
+                <h1>Bonjour, {restaurant?.name || 'Restaurant'} !</h1>
+                <p>Voici un aperçu de votre activité aujourd'hui</p>
+              </div>
+              <div className="header-actions">
+                <button className="btn-secondary">
+                  <Eye size={20} />
+                  <span className="btn-text">Voir mon menu</span>
+                </button>
+                <button className="btn-primary">
+                  <Plus size={20} />
+                  <span className="btn-text">Ajouter un plat</span>
+                </button>
+              </div>
+            </header>
 
-        {/* QR Code Section */}
-        {restaurant?.qr_code_url && (
-          <div className="qr-section">
-            <div className="qr-card">
-              <div className="qr-content">
-                <div className="qr-info">
-                  <h2>Votre QR Code</h2>
-                  <p>Imprimez et placez ce QR code sur vos tables pour que vos clients puissent accéder au menu</p>
-                  <div className="qr-actions">
-                    <button onClick={downloadQRCode} className="btn-download">
-                      <Download size={20} />
-                      Télécharger PNG
-                    </button>
-                    <button onClick={openMenuPreview} className="btn-preview">
-                      <ExternalLink size={20} />
-                      Voir le menu
-                    </button>
-                  </div>
+            {/* Quick Stats */}
+            <div className="quick-stats">
+              <div className="stat-card">
+                <div className="stat-icon orders">
+                  <Clock size={24} />
                 </div>
-                <div className="qr-display">
-                  <div className="qr-container">
-                    <img 
-                      src={restaurant.qr_code_url} 
-                      alt={`QR Code pour ${restaurant.name}`}
-                      className="qr-image"
-                    />
-                    <div className="qr-label">
-                      <QrCode size={16} />
-                      <span>Scannez pour commander</span>
+                <div className="stat-content">
+                  <h3>24</h3>
+                  <p>Commandes aujourd'hui</p>
+                  <span className="stat-change positive">+12%</span>
+                </div>
+              </div>
+
+              <div className="stat-card">
+                <div className="stat-icon revenue">
+                  <TrendingUp size={24} />
+                </div>
+                <div className="stat-content">
+                  <h3>458€</h3>
+                  <p>Chiffre d'affaires</p>
+                  <span className="stat-change positive">+8%</span>
+                </div>
+              </div>
+
+              <div className="stat-card">
+                <div className="stat-icon customers">
+                  <Users size={24} />
+                </div>
+                <div className="stat-content">
+                  <h3>127</h3>
+                  <p>Clients servis</p>
+                  <span className="stat-change positive">+15%</span>
+                </div>
+              </div>
+
+              <div className="stat-card">
+                <div className="stat-icon menu">
+                  <Menu size={24} />
+                </div>
+                <div className="stat-content">
+                  <h3>0</h3>
+                  <p>Plats au menu</p>
+                  <span className="stat-change neutral">Commencer</span>
+                </div>
+              </div>
+            </div>
+
+            {/* QR Code Section */}
+            {restaurant?.qr_code_url && (
+              <div className="qr-section">
+                <div className="qr-card">
+                  <div className="qr-content">
+                    <div className="qr-info">
+                      <h2>Votre QR Code</h2>
+                      <p>Imprimez et placez ce QR code sur vos tables pour que vos clients puissent accéder au menu</p>
+                      <div className="qr-actions">
+                        <button onClick={downloadQRCode} className="btn-download">
+                          <Download size={20} />
+                          <span>Télécharger</span>
+                        </button>
+                        <button onClick={openMenuPreview} className="btn-preview">
+                          <ExternalLink size={20} />
+                          <span>Prévisualiser</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div className="qr-display">
+                      <div className="qr-container">
+                        <img 
+                          src={restaurant.qr_code_url} 
+                          alt={`QR Code pour ${restaurant.name}`}
+                          className="qr-image"
+                        />
+                        <div className="qr-label">
+                          <QrCode size={16} />
+                          <span>Scannez pour commander</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
+            )}
+
+            {/* Quick Actions */}
+            <div className="quick-actions">
+              <h2>Actions rapides</h2>
+              <div className="actions-grid">
+                <div className="action-card">
+                  <div className="action-icon">
+                    <Menu size={32} />
+                  </div>
+                  <h3>Créer votre menu</h3>
+                  <p>Ajoutez vos premiers plats et commencez à vendre</p>
+                  <button className="action-btn">Commencer</button>
+                </div>
+
+                <div className="action-card">
+                  <div className="action-icon">
+                    <QrCode size={32} />
+                  </div>
+                  <h3>Imprimer le QR Code</h3>
+                  <p>Téléchargez et imprimez votre QR code pour vos tables</p>
+                  <button onClick={downloadQRCode} className="action-btn">Télécharger</button>
+                </div>
+
+                <div className="action-card">
+                  <div className="action-icon">
+                    <Settings size={32} />
+                  </div>
+                  <h3>Personnaliser</h3>
+                  <p>Ajoutez votre logo et personnalisez les couleurs</p>
+                  <button className="action-btn">Configurer</button>
+                </div>
+              </div>
+            </div>
+
+            {/* Restaurant Info */}
+            <div className="restaurant-info">
+              <h2>Informations du restaurant</h2>
+              <div className="info-grid">
+                <div className="info-card">
+                  <div className="info-item">
+                    <strong>Nom du restaurant</strong>
+                    <span>{restaurant?.name}</span>
+                  </div>
+                  <div className="info-item">
+                    <strong>Email</strong>
+                    <span>{restaurant?.email}</span>
+                  </div>
+                </div>
+                <div className="info-card">
+                  <div className="info-item">
+                    <strong>Téléphone</strong>
+                    <span>{restaurant?.phone || 'Non renseigné'}</span>
+                  </div>
+                  <div className="info-item">
+                    <strong>Adresse</strong>
+                    <span>{restaurant?.address || 'Non renseignée'}</span>
+                  </div>
+                </div>
+                <div className="info-card full-width">
+                  <div className="info-item">
+                    <strong>URL du menu</strong>
+                    <span className="menu-url">
+                      {typeof window !== 'undefined' ? `${window.location.origin}/menu/${restaurant?.id}` : ''}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Placeholder sections pour les autres vues */}
+        {activeSection !== 'overview' && (
+          <div className="placeholder-section">
+            <div className="placeholder-content">
+              <div className="placeholder-icon">
+                {menuItems.find(item => item.id === activeSection)?.icon && 
+                  React.createElement(menuItems.find(item => item.id === activeSection).icon, { size: 48 })
+                }
+              </div>
+              <h2>{menuItems.find(item => item.id === activeSection)?.label}</h2>
+              <p>Cette section sera développée prochainement.</p>
+              <button 
+                onClick={() => setActiveSection('overview')}
+                className="btn-secondary"
+              >
+                Retour à la vue d'ensemble
+              </button>
             </div>
           </div>
         )}
-
-        {/* Stats Cards */}
-        <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-icon orders">
-              <Users size={24} />
-            </div>
-            <div className="stat-content">
-              <h3>24</h3>
-              <p>Commandes aujourd'hui</p>
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-icon revenue">
-              <TrendingUp size={24} />
-            </div>
-            <div className="stat-content">
-              <h3>458€</h3>
-              <p>Chiffre d'affaires</p>
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-icon menu">
-              <Menu size={24} />
-            </div>
-            <div className="stat-content">
-              <h3>0</h3>
-              <p>Plats au menu</p>
-            </div>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-icon qr">
-              <QrCode size={24} />
-            </div>
-            <div className="stat-content">
-              <h3>1</h3>
-              <p>QR Code généré</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="quick-actions">
-          <h2>Actions rapides</h2>
-          <div className="actions-grid">
-            <div className="action-card">
-              <Menu size={40} />
-              <h3>Créer votre menu</h3>
-              <p>Ajoutez vos premiers plats et commencez à vendre</p>
-              <button className="action-btn">Commencer</button>
-            </div>
-
-            <div className="action-card">
-              <QrCode size={40} />
-              <h3>Imprimer le QR Code</h3>
-              <p>Téléchargez et imprimez votre QR code pour vos tables</p>
-              <button onClick={downloadQRCode} className="action-btn">Télécharger</button>
-            </div>
-
-            <div className="action-card">
-              <Settings size={40} />
-              <h3>Personnaliser</h3>
-              <p>Ajoutez votre logo et personnalisez les couleurs</p>
-              <button className="action-btn">Configurer</button>
-            </div>
-          </div>
-        </div>
-
-        {/* Restaurant Info */}
-        <div className="restaurant-info">
-          <h2>Informations du restaurant</h2>
-          <div className="info-card">
-            <div className="info-item">
-              <strong>Nom:</strong> {restaurant?.name}
-            </div>
-            <div className="info-item">
-              <strong>Email:</strong> {restaurant?.email}
-            </div>
-            <div className="info-item">
-              <strong>Téléphone:</strong> {restaurant?.phone || 'Non renseigné'}
-            </div>
-            <div className="info-item">
-              <strong>Adresse:</strong> {restaurant?.address || 'Non renseignée'}
-            </div>
-            <div className="info-item">
-              <strong>URL Menu:</strong> 
-              <span className="menu-url">{typeof window !== 'undefined' ? `${window.location.origin}/menu/${restaurant?.id}` : ''}</span>
-            </div>
-          </div>
-        </div>
       </main>
     </div>
   );
@@ -290,8 +424,10 @@ export default function Dashboard() {
   return (
     <Suspense fallback={
       <div className="dashboard-loading">
-        <div className="loading-spinner"></div>
-        <p>Chargement de votre dashboard...</p>
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <p>Chargement de votre dashboard...</p>
+        </div>
       </div>
     }>
       <DashboardContent />
