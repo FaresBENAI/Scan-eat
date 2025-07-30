@@ -5,7 +5,7 @@ import { supabase } from '../../../lib/supabase';
 import { useRouter } from 'next/navigation';
 import { 
   Plus, Edit3, Trash2, Image, Eye, EyeOff, Save, X, 
-  GripVertical, ArrowLeft, Upload, AlertCircle
+  GripVertical, ArrowLeft, Upload, AlertCircle, Move
 } from 'lucide-react';
 import './menu-management.css';
 
@@ -20,6 +20,7 @@ export default function MenuManagement() {
   const [editingItem, setEditingItem] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [draggedItem, setDraggedItem] = useState(null);
   const router = useRouter();
 
   // Form states
@@ -34,6 +35,7 @@ export default function MenuManagement() {
     price: '',
     category_id: '',
     available: true,
+    customizable: false,
     image_url: null,
     display_order: 0
   });
@@ -55,7 +57,6 @@ export default function MenuManagement() {
         return;
       }
 
-      // Récupérer les données du restaurant
       const { data: restaurantData, error: restaurantError } = await supabase
         .from('restaurants')
         .select('*')
@@ -79,7 +80,6 @@ export default function MenuManagement() {
 
   const loadMenuData = async (restaurantId) => {
     try {
-      // Charger les catégories (simulées pour l'instant)
       const mockCategories = [
         { id: 1, restaurant_id: restaurantId, name: 'Entrées', display_order: 1 },
         { id: 2, restaurant_id: restaurantId, name: 'Plats principaux', display_order: 2 },
@@ -88,7 +88,6 @@ export default function MenuManagement() {
       ];
       setCategories(mockCategories);
 
-      // Charger les plats (simulés pour l'instant)
       const mockMenuItems = [
         {
           id: 1,
@@ -99,6 +98,7 @@ export default function MenuManagement() {
           price: 12.50,
           image_url: null,
           available: true,
+          customizable: true,
           display_order: 1
         },
         {
@@ -110,6 +110,19 @@ export default function MenuManagement() {
           price: 15.90,
           image_url: null,
           available: true,
+          customizable: false,
+          display_order: 1
+        },
+        {
+          id: 3,
+          restaurant_id: restaurantId,
+          category_id: 3,
+          name: 'Tiramisu',
+          description: 'Dessert italien traditionnel au café et mascarpone',
+          price: 7.50,
+          image_url: null,
+          available: true,
+          customizable: false,
           display_order: 1
         }
       ];
@@ -118,6 +131,54 @@ export default function MenuManagement() {
       console.error('Erreur chargement menu:', error);
       setError('Erreur lors du chargement du menu');
     }
+  };
+
+  // Drag & Drop functions
+  const handleDragStart = (e, item) => {
+    setDraggedItem(item);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e, targetItem) => {
+    e.preventDefault();
+    
+    if (!draggedItem || draggedItem.id === targetItem.id) return;
+
+    // Réorganiser les items dans la même catégorie
+    if (draggedItem.category_id === targetItem.category_id) {
+      const categoryItems = menuItems
+        .filter(item => item.category_id === draggedItem.category_id)
+        .sort((a, b) => a.display_order - b.display_order);
+
+      const draggedIndex = categoryItems.findIndex(item => item.id === draggedItem.id);
+      const targetIndex = categoryItems.findIndex(item => item.id === targetItem.id);
+
+      // Réorganiser l'ordre
+      const newItems = [...categoryItems];
+      const [removed] = newItems.splice(draggedIndex, 1);
+      newItems.splice(targetIndex, 0, removed);
+
+      // Mettre à jour les display_order
+      const updatedItems = newItems.map((item, index) => ({
+        ...item,
+        display_order: index + 1
+      }));
+
+      // Mettre à jour l'état
+      setMenuItems(prev => [
+        ...prev.filter(item => item.category_id !== draggedItem.category_id),
+        ...updatedItems
+      ]);
+
+      setSuccess('Ordre des plats mis à jour');
+    }
+
+    setDraggedItem(null);
   };
 
   // Gestion des catégories
@@ -146,7 +207,6 @@ export default function MenuManagement() {
 
     try {
       if (editingCategory) {
-        // Modifier la catégorie existante
         setCategories(prev => prev.map(cat => 
           cat.id === editingCategory.id 
             ? { ...cat, ...categoryForm }
@@ -154,9 +214,8 @@ export default function MenuManagement() {
         ));
         setSuccess('Catégorie modifiée avec succès');
       } else {
-        // Ajouter nouvelle catégorie
         const newCategory = {
-          id: Date.now(), // Temporaire - sera remplacé par l'ID de la DB
+          id: Date.now(),
           restaurant_id: restaurant.id,
           ...categoryForm
         };
@@ -196,6 +255,7 @@ export default function MenuManagement() {
         price: item.price.toString(),
         category_id: item.category_id,
         available: item.available,
+        customizable: item.customizable || false,
         image_url: item.image_url,
         display_order: item.display_order
       });
@@ -208,6 +268,7 @@ export default function MenuManagement() {
         price: '',
         category_id: categoryId || (categories[0]?.id || ''),
         available: true,
+        customizable: false,
         image_url: null,
         display_order: menuItems.filter(item => item.category_id === categoryId).length + 1
       });
@@ -220,7 +281,7 @@ export default function MenuManagement() {
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) { // 5MB max
+      if (file.size > 5 * 1024 * 1024) {
         setError('L\'image ne doit pas dépasser 5MB');
         return;
       }
@@ -237,11 +298,7 @@ export default function MenuManagement() {
 
     try {
       setUploadingImage(true);
-      
-      // Simuler l'upload - à remplacer par Supabase Storage
       await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // URL simulée - sera remplacée par l'URL Supabase
       const imageUrl = URL.createObjectURL(imageFile);
       return imageUrl;
     } catch (error) {
@@ -266,7 +323,6 @@ export default function MenuManagement() {
     try {
       let imageUrl = itemForm.image_url;
       
-      // Upload de l'image si nécessaire
       if (imageFile) {
         imageUrl = await uploadImage();
       }
@@ -278,7 +334,6 @@ export default function MenuManagement() {
       };
 
       if (editingItem) {
-        // Modifier le plat existant
         setMenuItems(prev => prev.map(item => 
           item.id === editingItem.id 
             ? { ...item, ...itemData }
@@ -286,9 +341,8 @@ export default function MenuManagement() {
         ));
         setSuccess('Plat modifié avec succès');
       } else {
-        // Ajouter nouveau plat
         const newItem = {
-          id: Date.now(), // Temporaire
+          id: Date.now(),
           restaurant_id: restaurant.id,
           ...itemData
         };
@@ -304,6 +358,7 @@ export default function MenuManagement() {
         price: '',
         category_id: '',
         available: true,
+        customizable: false,
         image_url: null,
         display_order: 0
       });
@@ -345,7 +400,9 @@ export default function MenuManagement() {
   };
 
   const getItemsByCategory = (categoryId) => {
-    return menuItems.filter(item => item.category_id === categoryId);
+    return menuItems
+      .filter(item => item.category_id === categoryId)
+      .sort((a, b) => a.display_order - b.display_order);
   };
 
   // Clear messages
@@ -385,7 +442,7 @@ export default function MenuManagement() {
           
           <div className="header-info">
             <h1>Gestion du menu</h1>
-            <p>Gérez vos catégories et plats</p>
+            <p>Gérez vos catégories et plats • Glissez-déposez pour réorganiser</p>
           </div>
           
           <div className="header-actions">
@@ -467,62 +524,90 @@ export default function MenuManagement() {
                   </div>
                 </div>
 
-                {/* Liste des plats */}
-                <div className="items-grid">
+                {/* Liste des plats en ligne */}
+                <div className="items-list">
                   {getItemsByCategory(category.id).map(item => (
-                    <div key={item.id} className={`item-card ${!item.available ? 'unavailable' : ''}`}>
-                      <div className="item-image">
+                    <div 
+                      key={item.id} 
+                      className={`item-row ${!item.available ? 'unavailable' : ''} ${draggedItem?.id === item.id ? 'dragging' : ''}`}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, item)}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDrop(e, item)}
+                    >
+                      {/* Drag handle */}
+                      <div className="drag-handle">
+                        <GripVertical size={20} />
+                      </div>
+
+                      {/* Image */}
+                      <div className="item-image-container">
                         {item.image_url ? (
-                          <img src={item.image_url} alt={item.name} />
+                          <img src={item.image_url} alt={item.name} className="item-image" />
                         ) : (
                           <div className="placeholder-image">
-                            <Image size={32} />
+                            <Image size={24} />
                           </div>
                         )}
-                        <div className="item-overlay">
-                          <button 
-                            onClick={() => toggleItemAvailability(item.id)}
-                            className={`availability-btn ${item.available ? 'available' : 'unavailable'}`}
-                            title={item.available ? 'Marquer indisponible' : 'Marquer disponible'}
-                          >
-                            {item.available ? <Eye size={16} /> : <EyeOff size={16} />}
-                          </button>
-                        </div>
                       </div>
-                      
-                      <div className="item-content">
-                        <div className="item-info">
-                          <h3>{item.name}</h3>
-                          <p>{item.description}</p>
-                          <div className="item-price">{item.price.toFixed(2)}€</div>
+
+                      {/* Content */}
+                      <div className="item-main-content">
+                        <div className="item-header">
+                          <h3 className="item-name">{item.name}</h3>
+                          <div className="item-badges">
+                            {item.customizable && (
+                              <span className="badge customizable">Personnalisable</span>
+                            )}
+                            <span className={`badge availability ${item.available ? 'available' : 'unavailable'}`}>
+                              {item.available ? 'Disponible' : 'Indisponible'}
+                            </span>
+                          </div>
                         </div>
                         
-                        <div className="item-actions">
-                          <button 
-                            onClick={() => openItemModal(item)}
-                            className="btn-edit"
-                          >
-                            <Edit3 size={16} />
-                          </button>
-                          <button 
-                            onClick={() => deleteItem(item.id)}
-                            className="btn-delete"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                        <p className="item-description">{item.description}</p>
+                        
+                        <div className="item-footer">
+                          <div className="item-price">{item.price.toFixed(2)}€</div>
+                          <div className="item-order">Ordre: {item.display_order}</div>
                         </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="item-actions">
+                        <button 
+                          onClick={() => toggleItemAvailability(item.id)}
+                          className={`availability-toggle ${item.available ? 'available' : 'unavailable'}`}
+                          title={item.available ? 'Marquer indisponible' : 'Marquer disponible'}
+                        >
+                          {item.available ? <Eye size={16} /> : <EyeOff size={16} />}
+                        </button>
+                        <button 
+                          onClick={() => openItemModal(item)}
+                          className="btn-edit"
+                          title="Modifier"
+                        >
+                          <Edit3 size={16} />
+                        </button>
+                        <button 
+                          onClick={() => deleteItem(item.id)}
+                          className="btn-delete"
+                          title="Supprimer"
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </div>
                     </div>
                   ))}
                   
                   {/* Bouton d'ajout de plat */}
-                  <div className="add-item-card">
+                  <div className="add-item-row">
                     <button 
                       onClick={() => openItemModal(null, category.id)}
-                      className="add-item-btn"
+                      className="add-item-btn-inline"
                     >
-                      <Plus size={32} />
-                      <span>Ajouter un plat</span>
+                      <Plus size={20} />
+                      <span>Ajouter un plat à "{category.name}"</span>
                     </button>
                   </div>
                 </div>
@@ -532,7 +617,7 @@ export default function MenuManagement() {
         )}
       </main>
 
-      {/* Modal Catégorie */}
+      {/* Modal Catégorie - inchangé */}
       {showCategoryModal && (
         <div className="modal-overlay" onClick={() => setShowCategoryModal(false)}>
           <div className="modal category-modal" onClick={(e) => e.stopPropagation()}>
@@ -590,7 +675,7 @@ export default function MenuManagement() {
         </div>
       )}
 
-      {/* Modal Plat */}
+      {/* Modal Plat avec option Personnalisable */}
       {showItemModal && (
         <div className="modal-overlay" onClick={() => setShowItemModal(false)}>
           <div className="modal item-modal" onClick={(e) => e.stopPropagation()}>
@@ -690,15 +775,29 @@ export default function MenuManagement() {
                 </div>
               </div>
               
-              <div className="form-group">
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={itemForm.available}
-                    onChange={(e) => setItemForm(prev => ({ ...prev, available: e.target.checked }))}
-                  />
-                  <span>Plat disponible</span>
-                </label>
+              <div className="form-options">
+                <div className="form-group">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={itemForm.available}
+                      onChange={(e) => setItemForm(prev => ({ ...prev, available: e.target.checked }))}
+                    />
+                    <span>Plat disponible</span>
+                  </label>
+                </div>
+                
+                <div className="form-group">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={itemForm.customizable}
+                      onChange={(e) => setItemForm(prev => ({ ...prev, customizable: e.target.checked }))}
+                    />
+                    <span>Personnalisable par le client</span>
+                  </label>
+                  <small className="help-text">Le client pourra modifier des options (taille, accompagnements, etc.)</small>
+                </div>
               </div>
             </div>
             
