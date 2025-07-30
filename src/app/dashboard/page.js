@@ -106,6 +106,15 @@ function DashboardContent() {
     setSidebarOpen(false);
   };
 
+  const handleNavigation = (itemId) => {
+    if (itemId === 'menu') {
+      router.push('/dashboard/menu');
+    } else {
+      setActiveSection(itemId);
+    }
+    closeSidebar();
+  };
+
   const menuItems = [
     { id: 'overview', icon: BarChart3, label: 'Vue d\'ensemble', active: true },
     { id: 'menu', icon: Menu, label: 'Gestion du menu' },
@@ -199,10 +208,7 @@ function DashboardContent() {
           {menuItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => {
-                setActiveSection(item.id);
-                closeSidebar();
-              }}
+              onClick={() => handleNavigation(item.id)}
               className={`nav-item ${activeSection === item.id ? 'active' : ''}`}
             >
               <item.icon size={20} />
@@ -230,13 +236,19 @@ function DashboardContent() {
                 <p>Voici un aperçu de votre activité aujourd'hui</p>
               </div>
               <div className="header-actions">
-                <button className="btn-secondary">
+                <button 
+                  onClick={openMenuPreview}
+                  className="btn-secondary"
+                >
                   <Eye size={20} />
                   <span className="btn-text">Voir mon menu</span>
                 </button>
-                <button className="btn-primary">
+                <button 
+                  onClick={() => router.push('/dashboard/menu')}
+                  className="btn-primary"
+                >
                   <Plus size={20} />
-                  <span className="btn-text">Ajouter un plat</span>
+                  <span className="btn-text">Gérer le menu</span>
                 </button>
               </div>
             </header>
@@ -333,9 +345,14 @@ function DashboardContent() {
                   <div className="action-icon">
                     <Menu size={32} />
                   </div>
-                  <h3>Créer votre menu</h3>
+                  <h3>Gérer votre menu</h3>
                   <p>Ajoutez vos premiers plats et commencez à vendre</p>
-                  <button className="action-btn">Commencer</button>
+                  <button 
+                    onClick={() => router.push('/dashboard/menu')}
+                    className="action-btn"
+                  >
+                    Commencer
+                  </button>
                 </div>
 
                 <div className="action-card">
