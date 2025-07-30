@@ -4,18 +4,19 @@ import { useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { QrCode, Eye, EyeOff, ArrowLeft, LogIn, User, Building2 } from 'lucide-react';
 import './login.css';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
 
   const detectUserType = async (userId) => {
     try {
-      // Vérifier d'abord dans la table restaurants
       const { data: restaurantData, error: restaurantError } = await supabase
         .from('restaurants')
         .select('id, name')
@@ -26,7 +27,6 @@ export default function Login() {
         return { type: 'restaurant', data: restaurantData };
       }
 
-      // Si pas trouvé dans restaurants, vérifier dans customers
       const { data: customerData, error: customerError } = await supabase
         .from('customers')
         .select('id, name')
@@ -37,7 +37,6 @@ export default function Login() {
         return { type: 'customer', data: customerData };
       }
 
-      // Si trouvé nulle part, erreur
       throw new Error('Profil utilisateur non trouvé');
 
     } catch (error) {
@@ -46,15 +45,38 @@ export default function Login() {
     }
   };
 
+  const handleEmailChange = (e) => {
+    setEmail(e.target.value);
+    if (error) setError('');
+  };
+
+  const handlePasswordChange = (e) => {
+    setPassword(e.target.value);
+    if (error) setError('');
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
+    // Validation côté client
+    if (!email.trim()) {
+      setError('L\'email est requis');
+      setLoading(false);
+      return;
+    }
+
+    if (!password.trim()) {
+      setError('Le mot de passe est requis');
+      setLoading(false);
+      return;
+    }
+
     try {
       // 1. Authentification Supabase
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.trim(),
         password,
       });
 
@@ -67,74 +89,122 @@ export default function Login() {
       if (userInfo.type === 'restaurant') {
         router.push('/dashboard');
       } else if (userInfo.type === 'customer') {
-        // Pour l'instant, rediriger vers l'accueil
-        // Plus tard on aura un dashboard client
         router.push('/');
       }
 
     } catch (error) {
-      setError(error.message);
+      if (error.message.includes('Invalid login credentials')) {
+        setError('Email ou mot de passe incorrect');
+      } else {
+        setError(error.message);
+      }
     }
     
     setLoading(false);
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-card">
-        <div className="auth-header">
-          <h1>Connexion à Scan-eat</h1>
+    <div className="login-container">
+      {/* Back button */}
+      <Link href="/" className="back-btn">
+        <ArrowLeft size={20} />
+        <span>Retour à l'accueil</span>
+      </Link>
+
+      <div className="login-card">
+        <div className="login-header">
+          <div className="logo">
+            <QrCode size={32} />
+            <span>Scan-eat</span>
+          </div>
+          <h1>Connexion</h1>
           <p>Connectez-vous à votre compte restaurant ou client</p>
         </div>
 
-        <form onSubmit={handleLogin} className="auth-form">
+        {/* Info section */}
+        <div className="user-types-info">
+          <div className="user-type-item">
+            <div className="user-type-icon restaurant">
+              <Building2 size={20} />
+            </div>
+            <div className="user-type-content">
+              <strong>Restaurant</strong>
+              <span>Accédez à votre dashboard de gestion</span>
+            </div>
+          </div>
+          <div className="user-type-item">
+            <div className="user-type-icon client">
+              <User size={20} />
+            </div>
+            <div className="user-type-content">
+              <strong>Client</strong>
+              <span>Consultez vos commandes et favoris</span>
+            </div>
+          </div>
+        </div>
+
+        <form onSubmit={handleLogin} className="login-form">
           <div className="form-group">
             <label htmlFor="email">Email</label>
             <input
               id="email"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={handleEmailChange}
               required
               placeholder="votre@email.com"
+              className={error && !email.trim() ? 'error' : ''}
+              autoComplete="email"
             />
           </div>
 
           <div className="form-group">
             <label htmlFor="password">Mot de passe</label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              placeholder="••••••••"
-            />
+            <div className="password-input">
+              <input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={handlePasswordChange}
+                required
+                placeholder="••••••••"
+                className={error && !password.trim() ? 'error' : ''}
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                className="password-toggle"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
           </div>
 
           {error && <div className="error-message">{error}</div>}
 
-          <button type="submit" disabled={loading} className="auth-button">
-            {loading ? 'Connexion...' : 'Se connecter'}
+          <button type="submit" disabled={loading} className="login-btn">
+            {loading ? (
+              <div className="loading-spinner"></div>
+            ) : (
+              <>
+                <LogIn size={20} />
+                <span>Se connecter</span>
+              </>
+            )}
           </button>
         </form>
 
-        <div className="login-info">
-          <div className="user-types">
-            <div className="user-type">
-              <strong>Restaurant :</strong> Accédez à votre dashboard de gestion
-            </div>
-            <div className="user-type">
-              <strong>Client :</strong> Consultez vos commandes et favoris
-            </div>
-          </div>
+        {/* Forgot password link */}
+        <div className="forgot-password">
+          <Link href="/auth/forgot-password">Mot de passe oublié ?</Link>
         </div>
 
-        <div className="auth-footer">
+        <div className="login-footer">
           <p>Pas encore de compte ?{' '}
             <Link href="/auth/register">S'inscrire</Link>
           </p>
-          <Link href="/" className="back-home">← Retour à l'accueil</Link>
         </div>
       </div>
     </div>
