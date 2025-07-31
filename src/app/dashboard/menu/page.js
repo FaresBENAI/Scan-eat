@@ -108,6 +108,44 @@ export default function MenuManagement() {
     }
   };
 
+  // Upload d'image vers Supabase Storage
+  const uploadImage = async () => {
+    if (!imageFile || !restaurant) return null;
+
+    try {
+      setUploadingImage(true);
+      
+      // Générer un nom de fichier unique
+      const fileExt = imageFile.name.split('.').pop();
+      const fileName = `${restaurant.id}/${Date.now()}.${fileExt}`;
+
+      // Upload vers Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('menu-images')
+        .upload(fileName, imageFile, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (error) {
+        console.error('Erreur upload:', error);
+        throw error;
+      }
+
+      // Obtenir l'URL publique
+      const { data: { publicUrl } } = supabase.storage
+        .from('menu-images')
+        .getPublicUrl(fileName);
+
+      return publicUrl;
+    } catch (error) {
+      console.error('Erreur upload image:', error);
+      throw error;
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   // Drag & Drop functions
   const handleDragStart = (e, item) => {
     setDraggedItem(item);
@@ -308,25 +346,6 @@ export default function MenuManagement() {
     }
   };
 
-  const uploadImage = async () => {
-    if (!imageFile) return null;
-
-    try {
-      setUploadingImage(true);
-      
-      // TODO: Implémenter Supabase Storage
-      // Pour l'instant, simulation
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      const imageUrl = URL.createObjectURL(imageFile);
-      return imageUrl;
-    } catch (error) {
-      console.error('Erreur upload:', error);
-      throw error;
-    } finally {
-      setUploadingImage(false);
-    }
-  };
-
   const saveItemForm = async () => {
     if (!itemForm.name.trim()) {
       setError('Le nom du plat est requis');
@@ -342,6 +361,7 @@ export default function MenuManagement() {
     try {
       let imageUrl = itemForm.image_url;
       
+      // Upload de l'image si nécessaire
       if (imageFile) {
         imageUrl = await uploadImage();
       }
@@ -750,7 +770,7 @@ export default function MenuManagement() {
               <button 
                 onClick={() => setShowItemModal(false)}
                 className="close-btn"
-                disabled={saving}
+                disabled={saving || uploadingImage}
               >
                 <X size={24} />
               </button>
@@ -766,7 +786,7 @@ export default function MenuManagement() {
                     value={itemForm.name}
                     onChange={(e) => setItemForm(prev => ({ ...prev, name: e.target.value }))}
                     placeholder="Ex: Salade César"
-                    disabled={saving}
+                    disabled={saving || uploadingImage}
                   />
                 </div>
                 
@@ -780,7 +800,7 @@ export default function MenuManagement() {
                     value={itemForm.price}
                     onChange={(e) => setItemForm(prev => ({ ...prev, price: e.target.value }))}
                     placeholder="12.50"
-                    disabled={saving}
+                    disabled={saving || uploadingImage}
                   />
                 </div>
               </div>
@@ -791,7 +811,7 @@ export default function MenuManagement() {
                   id="itemCategory"
                   value={itemForm.category_id}
                   onChange={(e) => setItemForm(prev => ({ ...prev, category_id: e.target.value }))}
-                  disabled={saving}
+                  disabled={saving || uploadingImage}
                 >
                   {categories.map(category => (
                     <option key={category.id} value={category.id}>
@@ -809,7 +829,7 @@ export default function MenuManagement() {
                   onChange={(e) => setItemForm(prev => ({ ...prev, description: e.target.value }))}
                   placeholder="Décrivez les ingrédients et la préparation..."
                   rows="3"
-                  disabled={saving}
+                  disabled={saving || uploadingImage}
                 />
               </div>
               
@@ -822,11 +842,20 @@ export default function MenuManagement() {
                     onChange={handleImageChange}
                     className="image-input"
                     id="imageInput"
-                    disabled={saving}
+                    disabled={saving || uploadingImage}
                   />
-                  <label htmlFor="imageInput" className={`image-upload-btn ${saving ? 'disabled' : ''}`}>
-                    <Upload size={20} />
-                    <span>Choisir une image</span>
+                  <label htmlFor="imageInput" className={`image-upload-btn ${(saving || uploadingImage) ? 'disabled' : ''}`}>
+                    {uploadingImage ? (
+                      <>
+                        <div className="loading-spinner small"></div>
+                        <span>Upload en cours...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload size={20} />
+                        <span>Choisir une image</span>
+                      </>
+                    )}
                   </label>
                   
                   {imagePreview && (
@@ -839,7 +868,7 @@ export default function MenuManagement() {
                           setItemForm(prev => ({ ...prev, image_url: null }));
                         }}
                         className="remove-image"
-                        disabled={saving}
+                        disabled={saving || uploadingImage}
                       >
                         <X size={16} />
                       </button>
@@ -855,7 +884,7 @@ export default function MenuManagement() {
                       type="checkbox"
                       checked={itemForm.is_available}
                       onChange={(e) => setItemForm(prev => ({ ...prev, is_available: e.target.checked }))}
-                      disabled={saving}
+                      disabled={saving || uploadingImage}
                     />
                     <span>Plat disponible</span>
                   </label>
@@ -867,7 +896,7 @@ export default function MenuManagement() {
                       type="checkbox"
                       checked={itemForm.customizable}
                       onChange={(e) => setItemForm(prev => ({ ...prev, customizable: e.target.checked }))}
-                      disabled={saving}
+                      disabled={saving || uploadingImage}
                     />
                     <span>Personnalisable par le client</span>
                   </label>
@@ -880,26 +909,26 @@ export default function MenuManagement() {
               <button 
                 onClick={() => setShowItemModal(false)}
                 className="btn-secondary"
-                disabled={saving}
+                disabled={saving || uploadingImage}
               >
                 Annuler
               </button>
               <button 
-                onClick={saveItemForm}
-                className="btn-primary"
-                disabled={saving || uploadingImage}
-              >
-                {saving || uploadingImage ? (
-                  <div className="loading-spinner small"></div>
-                ) : (
-                  <Save size={20} />
-                )}
-                {editingItem ? 'Modifier' : 'Créer'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+               onClick={saveItemForm}
+               className="btn-primary"
+               disabled={saving || uploadingImage}
+             >
+               {saving || uploadingImage ? (
+                 <div className="loading-spinner small"></div>
+               ) : (
+                 <Save size={20} />
+               )}
+               {editingItem ? 'Modifier' : 'Créer'}
+             </button>
+           </div>
+         </div>
+       </div>
+     )}
+   </div>
+ );
 }
