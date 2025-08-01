@@ -67,7 +67,8 @@ export default function MenuManagement() {
     extra_price: 0,
     is_default: false,
     is_available: true,
-    display_order: 0
+    display_order: 0,
+    categoryId: null
   });
 
   const [imageFile, setImageFile] = useState(null);
@@ -275,7 +276,7 @@ export default function MenuManagement() {
     }
   };
 
-  // Gestion des options de customisation
+  // Gestion des options de customisation - CORRIGÉ
   const openCustomOptionModal = (option = null, categoryId = null) => {
     if (option) {
       setEditingCustomOption(option);
@@ -285,7 +286,8 @@ export default function MenuManagement() {
         extra_price: option.extra_price,
         is_default: option.is_default,
         is_available: option.is_available,
-        display_order: option.display_order
+        display_order: option.display_order,
+        categoryId: option.category_id
       });
     } else {
       setEditingCustomOption(null);
@@ -296,37 +298,51 @@ export default function MenuManagement() {
         extra_price: 0,
         is_default: false,
         is_available: true,
-        display_order: categoryOptions.length + 1
+        display_order: categoryOptions.length + 1,
+        categoryId: categoryId
       });
     }
     setShowOptionModal(true);
   };
 
-  const saveCustomOptionForm = async (categoryId) => {
+  const saveCustomOptionForm = async () => {
     if (!customOptionForm.name.trim()) {
       setError('Le nom de l\'option est requis');
       return;
     }
 
+    if (!customOptionForm.categoryId) {
+      setError('Erreur: catégorie non définie');
+      return;
+    }
+
     setSaving(true);
     try {
+      const optionData = {
+        name: customOptionForm.name,
+        description: customOptionForm.description,
+        extra_price: customOptionForm.extra_price,
+        is_default: customOptionForm.is_default,
+        is_available: customOptionForm.is_available,
+        display_order: customOptionForm.display_order
+      };
+
       if (editingCustomOption) {
         // Modifier
         const { error } = await supabase
           .from('customization_options')
-          .update(customOptionForm)
+          .update(optionData)
           .eq('id', editingCustomOption.id);
 
         if (error) throw error;
         setSuccess('Option modifiée');
       } else {
-        // Créer - utilise categoryId passé en paramètre
-        const targetCategoryId = categoryId || editingCustomOption?.category_id;
+        // Créer
         const { error } = await supabase
           .from('customization_options')
           .insert([{
-            category_id: targetCategoryId,
-            ...customOptionForm
+            category_id: customOptionForm.categoryId,
+            ...optionData
           }]);
 
         if (error) throw error;
@@ -335,6 +351,15 @@ export default function MenuManagement() {
 
       setShowOptionModal(false);
       setEditingCustomOption(null);
+      setCustomOptionForm({
+        name: '',
+        description: '',
+        extra_price: 0,
+        is_default: false,
+        is_available: true,
+        display_order: 0,
+        categoryId: null
+      });
       await loadCustomizations(customizingItem.id);
     } catch (error) {
       console.error('Erreur sauvegarde option custom:', error);
@@ -1538,14 +1563,7 @@ export default function MenuManagement() {
                 Annuler
               </button>
               <button 
-                onClick={() => {
-                  // Récupérer categoryId depuis le contexte
-                  const categoryId = customizationCategories.find(cat => 
-                    getOptionsForCategory(cat.id).length === 0 || 
-                    getOptionsForCategory(cat.id).some(opt => opt.id === editingCustomOption?.id)
-                  )?.id;
-                  saveCustomOptionForm(categoryId);
-                }}
+                onClick={saveCustomOptionForm}
                 className="btn-primary"
                 disabled={saving}
               >
