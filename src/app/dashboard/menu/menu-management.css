@@ -930,3 +930,350 @@
    border-radius: 2px;
  }
 }
+
+/* ====================================
+ * STYLES CUSTOMISATIONS
+ * ====================================*/
+
+/* Bouton customisation */
+.btn-edit.customization-btn {
+  background: rgba(139, 69, 19, 0.1);
+  color: #8B4513;
+  border: 1px solid rgba(139, 69, 19, 0.2);
+}
+
+.btn-edit.customization-btn:hover {
+  background: rgba(139, 69, 19, 0.15);
+  color: #6B3410;
+  transform: translateY(-1px);
+}
+
+/* Modal customisation principale */
+.customization-modal {
+  width: 100%;
+  max-width: 900px;
+  max-height: 90vh;
+}
+
+.customization-content {
+  padding: 0;
+}
+
+.customization-header {
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid rgba(29, 33, 41, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, rgba(139, 69, 19, 0.05) 0%, rgba(73, 80, 87, 0.02) 100%);
+}
+
+.customization-header p {
+  color: #6c757d;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.modal.customization-modal .modal-header {
+  background: linear-gradient(135deg, rgba(139, 69, 19, 0.05) 0%, rgba(73, 80, 87, 0.02) 100%);
+  border-bottom: 2px solid rgba(139, 69, 19, 0.1);
+}
+
+.modal.customization-modal .modal-header h2 {
+  color: #8B4513;
+  font-weight: 700;
+}
+
+/* État vide des customisations */
+.empty-customizations {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 3rem 2rem;
+}
+
+.empty-customizations .empty-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.empty-customizations h3 {
+  color: #1d2129;
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.empty-customizations p {
+  color: #6c757d;
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
+}
+
+/* Liste des catégories de customisation */
+.customization-categories {
+  padding: 1.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.custom-category-section {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(8px);
+  border-radius: 12px;
+  border: 1px solid rgba(208, 213, 221, 0.3);
+  overflow: hidden;
+  transition: all 0.3s ease;
+  animation: slideDown 0.3s ease-out;
+}
+
+.custom-category-section:hover {
+  box-shadow: 0 4px 12px rgba(29, 33, 41, 0.08);
+}
+
+.custom-category-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid rgba(29, 33, 41, 0.06);
+  background: rgba(29, 33, 41, 0.02);
+}
+
+.custom-category-info h3 {
+  color: #1d2129;
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem 0;
+}
+
+.custom-category-rules {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.rule-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.2s ease;
+}
+
+.rule-badge.required {
+  background: rgba(139, 69, 19, 0.1);
+  color: #8B4513;
+  border: 1px solid rgba(139, 69, 19, 0.2);
+}
+
+.rule-badge.optional {
+  background: rgba(73, 80, 87, 0.1);
+  color: #495057;
+  border: 1px solid rgba(73, 80, 87, 0.2);
+}
+
+.rule-badge.limit {
+  background: rgba(29, 33, 41, 0.08);
+  color: #6c757d;
+  border: 1px solid rgba(29, 33, 41, 0.15);
+}
+
+.custom-category-description {
+  color: #6c757d;
+  font-size: 0.85rem;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.custom-category-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  flex-shrink: 0;
+}
+
+/* Liste des options de customisation */
+.custom-options-list {
+  padding: 1rem 1.5rem;
+}
+
+.custom-option-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 8px;
+  border: 1px solid rgba(208, 213, 221, 0.2);
+  margin-bottom: 0.75rem;
+  transition: all 0.2s ease;
+  animation: slideDown 0.2s ease-out;
+}
+
+.custom-option-row:hover {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: rgba(208, 213, 221, 0.4);
+  transform: translateY(-1px);
+}
+
+.custom-option-row:last-child {
+  margin-bottom: 0;
+}
+
+.custom-option-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.custom-option-name {
+  color: #1d2129;
+  font-weight: 500;
+  font-size: 0.95rem;
+  margin-bottom: 0.25rem;
+}
+
+.custom-option-details {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.price-badge {
+  background: rgba(139, 69, 19, 0.1);
+  color: #8B4513;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.default-badge {
+  background: rgba(73, 80, 87, 0.1);
+  color: #495057;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.unavailable-badge {
+  background: rgba(29, 33, 41, 0.1);
+  color: #6c757d;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.custom-option-description {
+  color: #6c757d;
+  font-size: 0.8rem;
+  line-height: 1.3;
+  margin-top: 0.25rem;
+}
+
+.custom-option-actions {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.custom-option-actions .btn-edit,
+.custom-option-actions .btn-delete {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+}
+
+/* État vide des options */
+.empty-options {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 2rem 1rem;
+  background: rgba(29, 33, 41, 0.02);
+  border-radius: 8px;
+  border: 1px dashed rgba(29, 33, 41, 0.15);
+}
+
+.empty-options p {
+  color: #6c757d;
+  margin: 0 0 1rem 0;
+  font-size: 0.9rem;
+}
+
+/* Animations */
+@keyframes slideDown {
+  from { transform: translateY(-10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Responsive pour les customisations */
+@media (max-width: 768px) {
+  .customization-modal {
+    max-width: 95vw;
+    margin: 1rem;
+  }
+  
+  .customization-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .customization-categories {
+    padding: 1rem;
+  }
+  
+  .custom-category-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .custom-category-actions {
+    align-self: stretch;
+    justify-content: flex-end;
+  }
+  
+  .custom-option-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  
+  .custom-option-actions {
+    align-self: flex-end;
+  }
+  
+  .rule-badge {
+    font-size: 0.65rem;
+  }
+}
+
+/* Accessibilité customisations */
+.custom-category-actions button:focus-visible,
+.custom-option-actions button:focus-visible {
+  outline: 2px solid #8B4513;
+  outline-offset: 2px;
+}
+
+/* Interactions tactiles */
+@media (hover: none) and (pointer: coarse) {
+  .custom-category-actions button,
+  .custom-option-actions button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

@@ -5,7 +5,7 @@ import { supabase } from '../../../lib/supabase';
 import { useRouter } from 'next/navigation';
 import { 
   Plus, Edit3, Trash2, Image, Eye, EyeOff, Save, X, 
-  GripVertical, ArrowLeft, Upload, AlertCircle, Move
+  GripVertical, ArrowLeft, Upload, AlertCircle, Move, Settings
 } from 'lucide-react';
 import './menu-management.css';
 
@@ -24,6 +24,16 @@ export default function MenuManagement() {
   const [saving, setSaving] = useState(false);
   const router = useRouter();
 
+  // États customisations
+  const [showCustomizationModal, setShowCustomizationModal] = useState(false);
+  const [customizingItem, setCustomizingItem] = useState(null);
+  const [customizationCategories, setCustomizationCategories] = useState([]);
+  const [customizationOptions, setCustomizationOptions] = useState([]);
+  const [showCategoryCustomModal, setShowCategoryCustomModal] = useState(false);
+  const [showOptionModal, setShowOptionModal] = useState(false);
+  const [editingCustomCategory, setEditingCustomCategory] = useState(null);
+  const [editingCustomOption, setEditingCustomOption] = useState(null);
+
   // Form states
   const [categoryForm, setCategoryForm] = useState({
     name: '',
@@ -38,6 +48,25 @@ export default function MenuManagement() {
     is_available: true,
     customizable: false,
     image_url: null,
+    display_order: 0
+  });
+
+  // Forms customisations
+  const [customCategoryForm, setCustomCategoryForm] = useState({
+    name: '',
+    description: '',
+    is_required: false,
+    min_selections: 0,
+    max_selections: null,
+    display_order: 0
+  });
+
+  const [customOptionForm, setCustomOptionForm] = useState({
+    name: '',
+    description: '',
+    extra_price: 0,
+    is_default: false,
+    is_available: true,
     display_order: 0
   });
 
@@ -106,6 +135,237 @@ export default function MenuManagement() {
       console.error('Erreur chargement menu:', error);
       setError('Erreur lors du chargement du menu');
     }
+  };
+
+  // ====================================
+  // FONCTIONS CUSTOMISATION
+  // ====================================
+
+  // Charger les customisations d'un plat
+  const loadCustomizations = async (menuItemId) => {
+    try {
+      // Charger les catégories de customisation
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from('customization_categories')
+        .select('*')
+        .eq('menu_item_id', menuItemId)
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+
+      if (categoriesError) throw categoriesError;
+      setCustomizationCategories(categoriesData || []);
+
+      // Charger toutes les options de ces catégories
+      if (categoriesData && categoriesData.length > 0) {
+        const categoryIds = categoriesData.map(cat => cat.id);
+        const { data: optionsData, error: optionsError } = await supabase
+          .from('customization_options')
+          .select('*')
+          .in('category_id', categoryIds)
+          .order('display_order', { ascending: true });
+
+        if (optionsError) throw optionsError;
+        setCustomizationOptions(optionsData || []);
+      } else {
+        setCustomizationOptions([]);
+      }
+
+    } catch (error) {
+      console.error('Erreur chargement customisations:', error);
+      setError('Erreur lors du chargement des customisations');
+    }
+  };
+
+  // Ouvrir la modal de gestion des customisations
+  const openCustomizationModal = async (item) => {
+    setCustomizingItem(item);
+    await loadCustomizations(item.id);
+    setShowCustomizationModal(true);
+  };
+
+  // Gestion des catégories de customisation
+  const openCustomCategoryModal = (category = null) => {
+    if (category) {
+      setEditingCustomCategory(category);
+      setCustomCategoryForm({
+        name: category.name,
+        description: category.description || '',
+        is_required: category.is_required,
+        min_selections: category.min_selections,
+        max_selections: category.max_selections,
+        display_order: category.display_order
+      });
+    } else {
+      setEditingCustomCategory(null);
+      setCustomCategoryForm({
+        name: '',
+        description: '',
+        is_required: false,
+        min_selections: 0,
+        max_selections: null,
+        display_order: customizationCategories.length + 1
+      });
+    }
+    setShowCategoryCustomModal(true);
+  };
+
+  const saveCustomCategoryForm = async () => {
+    if (!customCategoryForm.name.trim()) {
+      setError('Le nom de la catégorie est requis');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const categoryData = {
+        ...customCategoryForm,
+        max_selections: customCategoryForm.max_selections === '' ? null : customCategoryForm.max_selections
+      };
+
+      if (editingCustomCategory) {
+        // Modifier
+        const { error } = await supabase
+          .from('customization_categories')
+          .update(categoryData)
+          .eq('id', editingCustomCategory.id);
+
+        if (error) throw error;
+        setSuccess('Catégorie de customisation modifiée');
+      } else {
+        // Créer
+        const { error } = await supabase
+          .from('customization_categories')
+          .insert([{
+            menu_item_id: customizingItem.id,
+            ...categoryData
+          }]);
+
+        if (error) throw error;
+        setSuccess('Catégorie de customisation ajoutée');
+      }
+
+      setShowCategoryCustomModal(false);
+      setEditingCustomCategory(null);
+      await loadCustomizations(customizingItem.id);
+    } catch (error) {
+      console.error('Erreur sauvegarde catégorie custom:', error);
+      setError('Erreur lors de la sauvegarde');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteCustomCategory = async (categoryId) => {
+    if (!window.confirm('Supprimer cette catégorie et toutes ses options ?')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('customization_categories')
+        .delete()
+        .eq('id', categoryId);
+
+      if (error) throw error;
+      setSuccess('Catégorie supprimée');
+      await loadCustomizations(customizingItem.id);
+    } catch (error) {
+      console.error('Erreur suppression catégorie custom:', error);
+      setError('Erreur lors de la suppression');
+    }
+  };
+
+  // Gestion des options de customisation
+  const openCustomOptionModal = (option = null, categoryId = null) => {
+    if (option) {
+      setEditingCustomOption(option);
+      setCustomOptionForm({
+        name: option.name,
+        description: option.description || '',
+        extra_price: option.extra_price,
+        is_default: option.is_default,
+        is_available: option.is_available,
+        display_order: option.display_order
+      });
+    } else {
+      setEditingCustomOption(null);
+      const categoryOptions = customizationOptions.filter(opt => opt.category_id === categoryId);
+      setCustomOptionForm({
+        name: '',
+        description: '',
+        extra_price: 0,
+        is_default: false,
+        is_available: true,
+        display_order: categoryOptions.length + 1
+      });
+    }
+    setShowOptionModal(true);
+  };
+
+  const saveCustomOptionForm = async (categoryId) => {
+    if (!customOptionForm.name.trim()) {
+      setError('Le nom de l\'option est requis');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      if (editingCustomOption) {
+        // Modifier
+        const { error } = await supabase
+          .from('customization_options')
+          .update(customOptionForm)
+          .eq('id', editingCustomOption.id);
+
+        if (error) throw error;
+        setSuccess('Option modifiée');
+      } else {
+        // Créer - utilise categoryId passé en paramètre
+        const targetCategoryId = categoryId || editingCustomOption?.category_id;
+        const { error } = await supabase
+          .from('customization_options')
+          .insert([{
+            category_id: targetCategoryId,
+            ...customOptionForm
+          }]);
+
+        if (error) throw error;
+        setSuccess('Option ajoutée');
+      }
+
+      setShowOptionModal(false);
+      setEditingCustomOption(null);
+      await loadCustomizations(customizingItem.id);
+    } catch (error) {
+      console.error('Erreur sauvegarde option custom:', error);
+      setError('Erreur lors de la sauvegarde');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteCustomOption = async (optionId) => {
+    if (!window.confirm('Supprimer cette option ?')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('customization_options')
+        .delete()
+        .eq('id', optionId);
+
+      if (error) throw error;
+      setSuccess('Option supprimée');
+      await loadCustomizations(customizingItem.id);
+    } catch (error) {
+      console.error('Erreur suppression option custom:', error);
+      setError('Erreur lors de la suppression');
+    }
+  };
+
+  const getOptionsForCategory = (categoryId) => {
+    return customizationOptions.filter(option => option.category_id === categoryId);
   };
 
   // Upload d'image vers Supabase Storage
@@ -656,6 +916,16 @@ export default function MenuManagement() {
                         >
                           {item.is_available ? <Eye size={16} /> : <EyeOff size={16} />}
                         </button>
+                        {item.customizable && (
+                          <button 
+                            onClick={() => openCustomizationModal(item)}
+                            className="btn-edit customization-btn"
+                            title="Gérer les customisations"
+                            disabled={saving}
+                          >
+                            <Settings size={16} />
+                          </button>
+                        )}
                         <button 
                           onClick={() => openItemModal(item)}
                           className="btn-edit"
@@ -914,21 +1184,378 @@ export default function MenuManagement() {
                 Annuler
               </button>
               <button 
-               onClick={saveItemForm}
-               className="btn-primary"
-               disabled={saving || uploadingImage}
-             >
-               {saving || uploadingImage ? (
-                 <div className="loading-spinner small"></div>
-               ) : (
-                 <Save size={20} />
-               )}
-               {editingItem ? 'Modifier' : 'Créer'}
-             </button>
-           </div>
-         </div>
-       </div>
-     )}
-   </div>
- );
+                onClick={saveItemForm}
+                className="btn-primary"
+                disabled={saving || uploadingImage}
+              >
+                {saving || uploadingImage ? (
+                  <div className="loading-spinner small"></div>
+                ) : (
+                  <Save size={20} />
+                )}
+                {editingItem ? 'Modifier' : 'Créer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Gestion Customisations */}
+      {showCustomizationModal && (
+        <div className="modal-overlay" onClick={() => !saving && setShowCustomizationModal(false)}>
+          <div className="modal customization-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Customisations - {customizingItem?.name}</h2>
+              <button 
+                onClick={() => setShowCustomizationModal(false)}
+                className="close-btn"
+                disabled={saving}
+              >
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="modal-content customization-content">
+              <div className="customization-header">
+                <p>Configurez les options de personnalisation pour ce plat</p>
+                <button 
+                  onClick={() => openCustomCategoryModal()}
+                  className="btn-primary"
+                  disabled={saving}
+                >
+                  <Plus size={16} />
+                  Nouvelle catégorie
+                </button>
+              </div>
+
+              {customizationCategories.length === 0 ? (
+                <div className="empty-customizations">
+                  <div className="empty-icon">⚙️</div>
+                  <h3>Aucune customisation</h3>
+                  <p>Créez des catégories de personnalisation (Tailles, Accompagnements, etc.)</p>
+                </div>
+              ) : (
+                <div className="customization-categories">
+                  {customizationCategories.map(category => (
+                    <div key={category.id} className="custom-category-section">
+                      <div className="custom-category-header">
+                        <div className="custom-category-info">
+                          <h3>{category.name}</h3>
+                          <div className="custom-category-rules">
+                            <span className={`rule-badge ${category.is_required ? 'required' : 'optional'}`}>
+                              {category.is_required ? 'Obligatoire' : 'Optionnel'}
+                            </span>
+                            {category.max_selections && (
+                              <span className="rule-badge limit">
+                                Max {category.max_selections}
+                              </span>
+                            )}
+                            {category.min_selections > 0 && (
+                              <span className="rule-badge limit">
+                                Min {category.min_selections}
+                              </span>
+                            )}
+                          </div>
+                          <p className="custom-category-description">{category.description}</p>
+                        </div>
+                        <div className="custom-category-actions">
+                          <button 
+                            onClick={() => openCustomOptionModal(null, category.id)}
+                            className="btn-add-item"
+                            title="Ajouter une option"
+                            disabled={saving}
+                          >
+                            <Plus size={16} />
+                          </button>
+                          <button 
+                            onClick={() => openCustomCategoryModal(category)}
+                            className="btn-edit"
+                            title="Modifier la catégorie"
+                            disabled={saving}
+                          >
+                            <Edit3 size={16} />
+                          </button>
+                          <button 
+                            onClick={() => deleteCustomCategory(category.id)}
+                            className="btn-delete"
+                            title="Supprimer la catégorie"
+                            disabled={saving}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="custom-options-list">
+                        {getOptionsForCategory(category.id).map(option => (
+                          <div key={option.id} className="custom-option-row">
+                            <div className="custom-option-info">
+                              <div className="custom-option-name">{option.name}</div>
+                              <div className="custom-option-details">
+                                {option.extra_price > 0 && (
+                                  <span className="price-badge">+{parseFloat(option.extra_price).toFixed(2)}€</span>
+                                )}
+                                {option.is_default && (
+                                  <span className="default-badge">Par défaut</span>
+                                )}
+                                {!option.is_available && (
+                                  <span className="unavailable-badge">Indisponible</span>
+                                )}
+                              </div>
+                              {option.description && (
+                                <div className="custom-option-description">{option.description}</div>
+                              )}
+                            </div>
+                            <div className="custom-option-actions">
+                              <button 
+                                onClick={() => openCustomOptionModal(option)}
+                                className="btn-edit"
+                                title="Modifier l'option"
+                                disabled={saving}
+                              >
+                                <Edit3 size={14} />
+                              </button>
+                              <button 
+                                onClick={() => deleteCustomOption(option.id)}
+                                className="btn-delete"
+                                title="Supprimer l'option"
+                                disabled={saving}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                        
+                        {getOptionsForCategory(category.id).length === 0 && (
+                          <div className="empty-options">
+                            <p>Aucune option dans cette catégorie</p>
+                            <button 
+                              onClick={() => openCustomOptionModal(null, category.id)}
+                              className="btn-secondary"
+                              disabled={saving}
+                            >
+                              <Plus size={16} />
+                              Ajouter une option
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Catégorie Customisation */}
+      {showCategoryCustomModal && (
+        <div className="modal-overlay" onClick={() => !saving && setShowCategoryCustomModal(false)}>
+          <div className="modal category-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>{editingCustomCategory ? 'Modifier la catégorie' : 'Nouvelle catégorie'}</h2>
+              <button 
+                onClick={() => setShowCategoryCustomModal(false)}
+                className="close-btn"
+                disabled={saving}
+              >
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="modal-content">
+              <div className="form-group">
+                <label>Nom de la catégorie *</label>
+                <input
+                  type="text"
+                  value={customCategoryForm.name}
+                  onChange={(e) => setCustomCategoryForm(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Ex: Tailles, Accompagnements, Sauces..."
+                  disabled={saving}
+                />
+              </div>
+              
+              <div className="form-group">
+                <label>Description</label>
+                <textarea
+                  value={customCategoryForm.description}
+                  onChange={(e) => setCustomCategoryForm(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Description optionnelle..."
+                  rows="2"
+                  disabled={saving}
+                />
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Sélections minimum</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={customCategoryForm.min_selections}
+                    onChange={(e) => setCustomCategoryForm(prev => ({ ...prev, min_selections: parseInt(e.target.value) || 0 }))}
+                    disabled={saving}
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label>Sélections maximum</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={customCategoryForm.max_selections || ''}
+                    onChange={(e) => setCustomCategoryForm(prev => ({ ...prev, max_selections: e.target.value ? parseInt(e.target.value) : null }))}
+                    placeholder="Illimité"
+                    disabled={saving}
+                  />
+                  <small className="help-text">Laissez vide pour un nombre illimité</small>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={customCategoryForm.is_required}
+                    onChange={(e) => setCustomCategoryForm(prev => ({ ...prev, is_required: e.target.checked }))}
+                    disabled={saving}
+                  />
+                  <span>Catégorie obligatoire</span>
+                </label>
+                <small className="help-text">Le client doit faire au moins une sélection</small>
+              </div>
+            </div>
+            
+            <div className="modal-footer">
+              <button 
+                onClick={() => setShowCategoryCustomModal(false)}
+                className="btn-secondary"
+                disabled={saving}
+              >
+                Annuler
+              </button>
+              <button 
+                onClick={saveCustomCategoryForm}
+                className="btn-primary"
+                disabled={saving}
+              >
+                {saving ? <div className="loading-spinner small"></div> : <Save size={20} />}
+                {editingCustomCategory ? 'Modifier' : 'Créer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Option Customisation */}
+      {showOptionModal && (
+        <div className="modal-overlay" onClick={() => !saving && setShowOptionModal(false)}>
+          <div className="modal category-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>{editingCustomOption ? 'Modifier l\'option' : 'Nouvelle option'}</h2>
+              <button 
+                onClick={() => setShowOptionModal(false)}
+                className="close-btn"
+                disabled={saving}
+              >
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="modal-content">
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Nom de l'option *</label>
+                  <input
+                    type="text"
+                    value={customOptionForm.name}
+                    onChange={(e) => setCustomOptionForm(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="Ex: Grande taille, Frites, Mayo..."
+                    disabled={saving}
+                  />
+                </div>
+                
+                <div className="form-group">
+                  <label>Supplément (€)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={customOptionForm.extra_price}
+                    onChange={(e) => setCustomOptionForm(prev => ({ ...prev, extra_price: parseFloat(e.target.value) || 0 }))}
+                    placeholder="0.00"
+                    disabled={saving}
+                  />
+                </div>
+              </div>
+              
+              <div className="form-group">
+                <label>Description</label>
+                <textarea
+                  value={customOptionForm.description}
+                  onChange={(e) => setCustomOptionForm(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Description optionnelle..."
+                  rows="2"
+                  disabled={saving}
+                />
+              </div>
+
+              <div className="form-options">
+                <div className="form-group">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={customOptionForm.is_default}
+                      onChange={(e) => setCustomOptionForm(prev => ({ ...prev, is_default: e.target.checked }))}
+                      disabled={saving}
+                    />
+                    <span>Sélectionné par défaut</span>
+                  </label>
+                </div>
+                
+                <div className="form-group">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={customOptionForm.is_available}
+                      onChange={(e) => setCustomOptionForm(prev => ({ ...prev, is_available: e.target.checked }))}
+                      disabled={saving}
+                    />
+                    <span>Option disponible</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+            
+            <div className="modal-footer">
+              <button 
+                onClick={() => setShowOptionModal(false)}
+                className="btn-secondary"
+                disabled={saving}
+              >
+                Annuler
+              </button>
+              <button 
+                onClick={() => {
+                  // Récupérer categoryId depuis le contexte
+                  const categoryId = customizationCategories.find(cat => 
+                    getOptionsForCategory(cat.id).length === 0 || 
+                    getOptionsForCategory(cat.id).some(opt => opt.id === editingCustomOption?.id)
+                  )?.id;
+                  saveCustomOptionForm(categoryId);
+                }}
+                className="btn-primary"
+                disabled={saving}
+              >
+                {saving ? <div className="loading-spinner small"></div> : <Save size={20} />}
+                {editingCustomOption ? 'Modifier' : 'Créer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
