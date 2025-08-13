@@ -107,9 +107,7 @@ function DashboardContent() {
   };
 
   const handleNavigation = (itemId) => {
-    if (itemId === 'menu') {
-      router.push('/dashboard/menu');
-    } else {
+if (itemId === 'menu') {      router.push('/dashboard/menu');    } else if (itemId === 'orders') {      router.push('/dashboard/orders');    } else {      setActiveSection(itemId);    }
       setActiveSection(itemId);
     }
     closeSidebar();
@@ -352,6 +350,20 @@ function DashboardContent() {
                     className="action-btn"
                   >
                     Commencer
+                </div>
+
+                <div className="action-card">
+                  <div className="action-icon">
+                    <Clock size={32} />
+                  </div>
+                  <h3>Voir les commandes</h3>
+                  <p>Consultez et gérez les commandes reçues</p>
+                  <button 
+                    onClick={() => router.push("/dashboard/orders")}
+                    className="action-btn"
+                  >
+                    Voir commandes
+                  </button>
                   </button>
                 </div>
 
