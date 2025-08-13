@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { 
   ShoppingCart, Plus, Minus, Phone, MapPin, Clock, 
   Star, ChefHat, X, ArrowLeft, Search, Filter, Settings,
-  Check, AlertCircle
+  Check, AlertCircle, User, Mail, Hash
 } from 'lucide-react';
 import './menu.css';
 
@@ -30,6 +30,18 @@ export default function MenuPage({ params }) {
   const [selectedCustomizations, setSelectedCustomizations] = useState({});
   const [customizationErrors, setCustomizationErrors] = useState({});
   const [customizationLoading, setCustomizationLoading] = useState(false);
+  
+  // États pour la finalisation de commande
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [orderForm, setOrderForm] = useState({
+    customerName: '',
+    customerPhone: '',
+    customerEmail: '',
+    tableNumber: ''
+  });
+  const [orderErrors, setOrderErrors] = useState({});
+  const [orderLoading, setOrderLoading] = useState(false);
+  const [orderSuccess, setOrderSuccess] = useState(null);
   
   const router = useRouter();
 
@@ -354,6 +366,97 @@ export default function MenuPage({ params }) {
   const getCategoryName = (categoryId) => {
     const category = categories.find(cat => cat.id === categoryId);
     return category ? category.name : 'Sans catégorie';
+  };
+
+  // Validation du formulaire de commande
+  const validateOrderForm = () => {
+    const errors = {};
+    
+    if (!orderForm.customerName.trim()) {
+      errors.customerName = 'Le nom est obligatoire';
+    }
+    
+    if (!orderForm.customerPhone.trim()) {
+      errors.customerPhone = 'Le téléphone est obligatoire';
+    } else if (!/^[0-9+\-\s()]{8,}$/.test(orderForm.customerPhone.trim())) {
+      errors.customerPhone = 'Format de téléphone invalide';
+    }
+    
+    if (orderForm.customerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(orderForm.customerEmail)) {
+      errors.customerEmail = 'Format d\'email invalide';
+    }
+    
+    setOrderErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // Créer la commande
+  const handleCreateOrder = async () => {
+    if (!validateOrderForm()) {
+      return;
+    }
+
+    setOrderLoading(true);
+    
+    try {
+      // Créer la commande principale
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          restaurant_id: params.id,
+          customer_name: orderForm.customerName.trim(),
+          customer_phone: orderForm.customerPhone.trim(),
+          customer_email: orderForm.customerEmail.trim() || null,
+          table_number: orderForm.tableNumber.trim() || null,
+          total_amount: getTotalPrice(),
+          status: 'pending',
+          payment_status: 'pending'
+        })
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      // Créer les items de commande
+      const orderItems = cart.map(item => ({
+        order_id: orderData.id,
+        menu_item_id: item.id,
+        quantity: item.quantity,
+        unit_price: parseFloat(item.price),
+        special_instructions: item.customizations ? JSON.stringify({
+          customizations: item.customizations,
+          customizationText: item.customizationText,
+          originalPrice: item.originalPrice,
+          extraPrice: item.extraPrice
+        }) : null
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
+
+      if (itemsError) throw itemsError;
+
+      // Succès !
+      setOrderSuccess(orderData);
+      setCart([]);
+      setCheckoutOpen(false);
+      setCartOpen(false);
+      
+      // Reset du formulaire
+      setOrderForm({
+        customerName: '',
+        customerPhone: '',
+        customerEmail: '',
+        tableNumber: ''
+      });
+
+    } catch (error) {
+      console.error('Erreur création commande:', error);
+      setError('Erreur lors de la création de la commande');
+    } finally {
+      setOrderLoading(false);
+    }
   };
 
   const filteredMenuItems = menuItems.filter(item => {
@@ -744,29 +847,218 @@ export default function MenuPage({ params }) {
                     <span className="cart-quantity">{item.quantity}</span>
                     <button 
                       onClick={() => addToCart(item)}
-                      className="cart-quantity-btn"
-                    >
-                      <Plus size={16} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-            
-            <div className="cart-footer">
-              <div className="cart-total-section">
-                <div className="total-line">
-                  <span>Total</span>
-                  <span className="total-amount">{getTotalPrice().toFixed(2)}€</span>
-                </div>
-              </div>
-              <button className="checkout-btn">
-                Passer la commande
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+                      className="cart-quantity-
+                     className="cart-quantity-btn"
+                   >
+                     <Plus size={16} />
+                   </button>
+                 </div>
+               </div>
+             ))}
+           </div>
+           
+           <div className="cart-footer">
+             <div className="cart-total-section">
+               <div className="total-line">
+                 <span>Total</span>
+                 <span className="total-amount">{getTotalPrice().toFixed(2)}€</span>
+               </div>
+             </div>
+             <button 
+               onClick={() => setCheckoutOpen(true)}
+               className="checkout-btn"
+             >
+               Passer la commande
+             </button>
+           </div>
+         </div>
+       </div>
+     )}
+
+     {/* Checkout Modal */}
+     {checkoutOpen && (
+       <div className="checkout-overlay" onClick={() => setCheckoutOpen(false)}>
+         <div className="checkout-modal" onClick={(e) => e.stopPropagation()}>
+           <div className="checkout-header">
+             <h2>Finaliser la commande</h2>
+             <button 
+               onClick={() => setCheckoutOpen(false)}
+               className="close-checkout"
+               aria-label="Fermer"
+             >
+               <X size={24} />
+             </button>
+           </div>
+           
+           <div className="checkout-content">
+             <div className="checkout-form">
+               <div className="form-group">
+                 <label htmlFor="customerName">
+                   <User size={16} />
+                   Nom complet *
+                 </label>
+                 <input
+                   id="customerName"
+                   type="text"
+                   value={orderForm.customerName}
+                   onChange={(e) => setOrderForm(prev => ({ ...prev, customerName: e.target.value }))}
+                   placeholder="Votre nom et prénom"
+                   className={orderErrors.customerName ? 'error' : ''}
+                 />
+                 {orderErrors.customerName && (
+                   <span className="field-error">{orderErrors.customerName}</span>
+                 )}
+               </div>
+
+               <div className="form-group">
+                 <label htmlFor="customerPhone">
+                   <Phone size={16} />
+                   Téléphone *
+                 </label>
+                 <input
+                   id="customerPhone"
+                   type="tel"
+                   value={orderForm.customerPhone}
+                   onChange={(e) => setOrderForm(prev => ({ ...prev, customerPhone: e.target.value }))}
+                   placeholder="06 12 34 56 78"
+                   className={orderErrors.customerPhone ? 'error' : ''}
+                 />
+                 {orderErrors.customerPhone && (
+                   <span className="field-error">{orderErrors.customerPhone}</span>
+                 )}
+               </div>
+
+               <div className="form-group">
+                 <label htmlFor="customerEmail">
+                   <Mail size={16} />
+                   Email (optionnel)
+                 </label>
+                 <input
+                   id="customerEmail"
+                   type="email"
+                   value={orderForm.customerEmail}
+                   onChange={(e) => setOrderForm(prev => ({ ...prev, customerEmail: e.target.value }))}
+                   placeholder="votre@email.com"
+                   className={orderErrors.customerEmail ? 'error' : ''}
+                 />
+                 {orderErrors.customerEmail && (
+                   <span className="field-error">{orderErrors.customerEmail}</span>
+                 )}
+               </div>
+
+               <div className="form-group">
+                 <label htmlFor="tableNumber">
+                   <Hash size={16} />
+                   Numéro de table (optionnel)
+                 </label>
+                 <input
+                   id="tableNumber"
+                   type="text"
+                   value={orderForm.tableNumber}
+                   onChange={(e) => setOrderForm(prev => ({ ...prev, tableNumber: e.target.value }))}
+                   placeholder="Table 5, Terrasse A..."
+                 />
+               </div>
+             </div>
+
+             <div className="order-summary">
+               <h3>Récapitulatif</h3>
+               <div className="summary-items">
+                 {cart.map(item => (
+                   <div key={item.itemKey || item.id} className="summary-item">
+                     <div className="summary-item-info">
+                       <span className="summary-item-name">{item.name}</span>
+                       {item.customizationText && (
+                         <span className="summary-item-custom">{item.customizationText}</span>
+                       )}
+                     </div>
+                     <div className="summary-item-price">
+                       <span className="summary-quantity">x{item.quantity}</span>
+                       <span className="summary-price">{(parseFloat(item.price) * item.quantity).toFixed(2)}€</span>
+                     </div>
+                   </div>
+                 ))}
+               </div>
+               <div className="summary-total">
+                 <span>Total à payer</span>
+                 <span className="summary-total-amount">{getTotalPrice().toFixed(2)}€</span>
+               </div>
+             </div>
+           </div>
+           
+           <div className="checkout-footer">
+             <button 
+               onClick={handleCreateOrder}
+               disabled={orderLoading}
+               className="confirm-order-btn"
+             >
+               {orderLoading ? (
+                 <>
+                   <div className="loading-spinner-small"></div>
+                   Création en cours...
+                 </>
+               ) : (
+                 <>
+                   <Check size={20} />
+                   Confirmer la commande
+                 </>
+               )}
+             </button>
+           </div>
+         </div>
+       </div>
+     )}
+
+     {/* Order Success Modal */}
+     {orderSuccess && (
+       <div className="success-overlay">
+         <div className="success-modal">
+           <div className="success-content">
+             <div className="success-icon">
+               <Check size={48} />
+             </div>
+             <h2>Commande confirmée !</h2>
+             <p>Votre commande <strong>#{orderSuccess.id.slice(0, 8)}</strong> a été transmise au restaurant.</p>
+             
+             <div className="success-details">
+               <div className="success-restaurant">
+                 <h3>{restaurant.name}</h3>
+                 <p>Vous recevrez une notification quand votre commande sera prête.</p>
+               </div>
+               
+               <div className="success-summary">
+                 <div className="success-total">
+                   <span>Total payé</span>
+                   <span className="success-amount">{orderSuccess.total_amount.toFixed(2)}€</span>
+                 </div>
+                 <div className="success-info">
+                   <span>Client: {orderSuccess.customer_name}</span>
+                   <span>Téléphone: {orderSuccess.customer_phone}</span>
+                   {orderSuccess.table_number && (
+                     <span>Table: {orderSuccess.table_number}</span>
+                   )}
+                 </div>
+               </div>
+             </div>
+             
+             <div className="success-actions">
+               <button 
+                 onClick={() => setOrderSuccess(null)}
+                 className="continue-btn"
+               >
+                 Continuer la navigation
+               </button>
+               <button 
+                 onClick={() => router.push('/')}
+                 className="home-btn"
+               >
+                 Retour à l'accueil
+               </button>
+             </div>
+           </div>
+         </div>
+       </div>
+     )}
+   </div>
+ );
 }
