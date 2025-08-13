@@ -842,12 +842,12 @@ export default function MenuPage({ params }) {
                       onClick={() => removeFromCart(item.itemKey || item.id)}
                       className="cart-quantity-btn"
                     >
-                      <Minus size={16} />
-                    </button>
-                    <span className="cart-quantity">{item.quantity}</span>
-                    <button 
-                      onClick={() => addToCart(item)}
-                      className="cart-quantity-
+                   <button 
+                     onClick={() => addToCart(item)}
+                     className="cart-quantity-btn"
+                   >
+                     <Plus size={16} />
+                   </button>
                      className="cart-quantity-btn"
                    >
                      <Plus size={16} />
