@@ -5,7 +5,8 @@ import { supabase } from '../../../lib/supabase';
 import { useRouter } from 'next/navigation';
 import { 
   ShoppingCart, Plus, Minus, Phone, MapPin, Clock, 
-  Star, ChefHat, X, ArrowLeft, Search, Filter, Settings
+  Star, ChefHat, X, ArrowLeft, Search, Filter, Settings,
+  Check, AlertCircle
 } from 'lucide-react';
 import './menu.css';
 
@@ -19,6 +20,17 @@ export default function MenuPage({ params }) {
   const [cartOpen, setCartOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  
+  // États pour la modal de customisation
+  const [customizationOpen, setCustomizationOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [customizations, setCustomizations] = useState({});
+  const [customizationCategories, setCustomizationCategories] = useState([]);
+  const [customizationOptions, setCustomizationOptions] = useState([]);
+  const [selectedCustomizations, setSelectedCustomizations] = useState({});
+  const [customizationErrors, setCustomizationErrors] = useState({});
+  const [customizationLoading, setCustomizationLoading] = useState(false);
+  
   const router = useRouter();
 
   useEffect(() => {
@@ -77,24 +89,249 @@ export default function MenuPage({ params }) {
     }
   };
 
+  const loadCustomizations = async (itemId) => {
+    setCustomizationLoading(true);
+    try {
+      // Charger les catégories de customisation
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from('customization_categories')
+        .select('*')
+        .eq('menu_item_id', itemId)
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+
+      if (categoriesError) throw categoriesError;
+
+      // Charger les options de customisation
+      const { data: optionsData, error: optionsError } = await supabase
+        .from('customization_options')
+        .select('*')
+        .in('category_id', categoriesData.map(cat => cat.id))
+        .eq('is_available', true)
+        .order('display_order', { ascending: true });
+
+      if (optionsError) throw optionsError;
+
+      setCustomizationCategories(categoriesData || []);
+      setCustomizationOptions(optionsData || []);
+
+      // Initialiser les sélections avec les options par défaut
+      const initialSelections = {};
+      categoriesData.forEach(category => {
+        const categoryOptions = optionsData.filter(opt => opt.category_id === category.id);
+        const defaultOptions = categoryOptions.filter(opt => opt.is_default);
+        
+        if (category.max_selections === 1) {
+          // Choix unique
+          initialSelections[category.id] = defaultOptions[0]?.id || null;
+        } else {
+          // Choix multiple
+          initialSelections[category.id] = defaultOptions.map(opt => opt.id);
+        }
+      });
+
+      setSelectedCustomizations(initialSelections);
+      setCustomizationErrors({});
+
+    } catch (error) {
+      console.error('Erreur chargement customisations:', error);
+      setError('Erreur lors du chargement des options');
+    } finally {
+      setCustomizationLoading(false);
+    }
+  };
+
+  const handleCustomizationToggle = (categoryId, optionId, category) => {
+    setSelectedCustomizations(prev => {
+      const current = prev[categoryId] || (category.max_selections === 1 ? null : []);
+      
+      if (category.max_selections === 1) {
+        // Choix unique
+        return {
+          ...prev,
+          [categoryId]: current === optionId ? null : optionId
+        };
+      } else {
+        // Choix multiple
+        const currentArray = Array.isArray(current) ? current : [];
+        const isSelected = currentArray.includes(optionId);
+        
+        if (isSelected) {
+          return {
+            ...prev,
+            [categoryId]: currentArray.filter(id => id !== optionId)
+          };
+        } else {
+          // Vérifier la limite max
+          if (category.max_selections && currentArray.length >= category.max_selections) {
+            return prev; // Ne pas ajouter si limite atteinte
+          }
+          return {
+            ...prev,
+            [categoryId]: [...currentArray, optionId]
+          };
+        }
+      }
+    });
+
+    // Effacer les erreurs pour cette catégorie
+    setCustomizationErrors(prev => ({
+      ...prev,
+      [categoryId]: null
+    }));
+  };
+
+  const validateCustomizations = () => {
+    const errors = {};
+    let isValid = true;
+
+    customizationCategories.forEach(category => {
+      const selections = selectedCustomizations[category.id];
+      const selectionCount = category.max_selections === 1 
+        ? (selections ? 1 : 0)
+        : (Array.isArray(selections) ? selections.length : 0);
+
+      // Vérifier minimum requis
+      if (category.is_required && selectionCount < category.min_selections) {
+        errors[category.id] = `Veuillez sélectionner au moins ${category.min_selections} option(s)`;
+        isValid = false;
+      }
+
+      // Vérifier maximum (normalement géré par l'interface, mais sécurité)
+      if (category.max_selections && selectionCount > category.max_selections) {
+        errors[category.id] = `Maximum ${category.max_selections} option(s) autorisée(s)`;
+        isValid = false;
+      }
+    });
+
+    setCustomizationErrors(errors);
+    return isValid;
+  };
+
+  const calculateCustomizationPrice = () => {
+    let extraPrice = 0;
+
+    Object.entries(selectedCustomizations).forEach(([categoryId, selections]) => {
+      const category = customizationCategories.find(cat => cat.id === categoryId);
+      if (!category) return;
+
+      if (category.max_selections === 1) {
+        // Choix unique
+        if (selections) {
+          const option = customizationOptions.find(opt => opt.id === selections);
+          if (option) {
+            extraPrice += parseFloat(option.extra_price || 0);
+          }
+        }
+      } else {
+        // Choix multiple
+        if (Array.isArray(selections)) {
+          selections.forEach(optionId => {
+            const option = customizationOptions.find(opt => opt.id === optionId);
+            if (option) {
+              extraPrice += parseFloat(option.extra_price || 0);
+            }
+          });
+        }
+      }
+    });
+
+    return extraPrice;
+  };
+
+  const getSelectedOptionsText = () => {
+    const texts = [];
+
+    Object.entries(selectedCustomizations).forEach(([categoryId, selections]) => {
+      const category = customizationCategories.find(cat => cat.id === categoryId);
+      if (!category) return;
+
+      if (category.max_selections === 1) {
+        if (selections) {
+          const option = customizationOptions.find(opt => opt.id === selections);
+          if (option) {
+            texts.push(`${category.name}: ${option.name}`);
+          }
+        }
+      } else {
+        if (Array.isArray(selections) && selections.length > 0) {
+          const optionNames = selections.map(optionId => {
+            const option = customizationOptions.find(opt => opt.id === optionId);
+            return option ? option.name : '';
+          }).filter(Boolean);
+          
+          if (optionNames.length > 0) {
+            texts.push(`${category.name}: ${optionNames.join(', ')}`);
+          }
+        }
+      }
+    });
+
+    return texts.join(' • ');
+  };
+
+  const handleAddToCart = (item) => {
+    if (item.customizable) {
+      setSelectedItem(item);
+      setCustomizationOpen(true);
+      loadCustomizations(item.id);
+    } else {
+      // Ajouter directement au panier
+      addToCart(item);
+    }
+  };
+
+  const handleCustomizedAddToCart = () => {
+    if (!validateCustomizations()) {
+      return;
+    }
+
+    const extraPrice = calculateCustomizationPrice();
+    const customizedItem = {
+      ...selectedItem,
+      price: parseFloat(selectedItem.price) + extraPrice,
+      originalPrice: parseFloat(selectedItem.price),
+      extraPrice: extraPrice,
+      customizations: { ...selectedCustomizations },
+      customizationText: getSelectedOptionsText()
+    };
+
+    addToCart(customizedItem);
+    setCustomizationOpen(false);
+    setSelectedItem(null);
+    setSelectedCustomizations({});
+  };
+
   const addToCart = (item) => {
     setCart(prevCart => {
-      const existingItem = prevCart.find(cartItem => cartItem.id === item.id);
+      // Pour les items personnalisés, créer un ID unique basé sur les customisations
+      const itemKey = item.customizations 
+        ? `${item.id}_${JSON.stringify(item.customizations)}`
+        : item.id;
+
+      const existingItem = prevCart.find(cartItem => 
+        cartItem.customizations 
+          ? `${cartItem.id}_${JSON.stringify(cartItem.customizations)}` === itemKey
+          : cartItem.id === itemKey
+      );
+
       if (existingItem) {
         return prevCart.map(cartItem =>
-          cartItem.id === item.id
+          (cartItem.customizations 
+            ? `${cartItem.id}_${JSON.stringify(cartItem.customizations)}` === itemKey
+            : cartItem.id === itemKey)
             ? { ...cartItem, quantity: cartItem.quantity + 1 }
             : cartItem
         );
       }
-      return [...prevCart, { ...item, quantity: 1 }];
+      return [...prevCart, { ...item, quantity: 1, itemKey }];
     });
   };
 
-  const removeFromCart = (itemId) => {
+  const removeFromCart = (itemKey) => {
     setCart(prevCart => {
       return prevCart.map(cartItem =>
-        cartItem.id === itemId
+        cartItem.itemKey === itemKey
           ? { ...cartItem, quantity: Math.max(0, cartItem.quantity - 1) }
           : cartItem
       ).filter(cartItem => cartItem.quantity > 0);
@@ -102,8 +339,8 @@ export default function MenuPage({ params }) {
   };
 
   const getItemQuantity = (itemId) => {
-    const item = cart.find(cartItem => cartItem.id === itemId);
-    return item ? item.quantity : 0;
+    const items = cart.filter(cartItem => cartItem.id === itemId);
+    return items.reduce((total, item) => total + item.quantity, 0);
   };
 
   const getTotalPrice = () => {
@@ -276,11 +513,11 @@ export default function MenuPage({ params }) {
                   <div className="item-actions">
                     {getItemQuantity(item.id) === 0 ? (
                       <button 
-                        onClick={() => addToCart(item)}
+                        onClick={() => handleAddToCart(item)}
                         className="add-btn"
                       >
                         <Plus size={20} />
-                        Ajouter
+                        {item.customizable ? 'Personnaliser' : 'Ajouter'}
                       </button>
                     ) : (
                       <div className="quantity-controls">
@@ -293,7 +530,7 @@ export default function MenuPage({ params }) {
                         </button>
                         <span className="quantity">{getItemQuantity(item.id)}</span>
                         <button 
-                          onClick={() => addToCart(item)}
+                          onClick={() => handleAddToCart(item)}
                           className="quantity-btn"
                           aria-label="Augmenter la quantité"
                         >
@@ -329,6 +566,140 @@ export default function MenuPage({ params }) {
         </button>
       )}
 
+      {/* Customization Modal */}
+      {customizationOpen && selectedItem && (
+        <div className="customization-overlay" onClick={() => setCustomizationOpen(false)}>
+          <div className="customization-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="customization-header">
+              <div className="customization-title">
+                <h2>Personnaliser</h2>
+                <h3>{selectedItem.name}</h3>
+              </div>
+              <button 
+                onClick={() => setCustomizationOpen(false)}
+                className="close-customization"
+                aria-label="Fermer"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="customization-content">
+              {customizationLoading ? (
+                <div className="customization-loading">
+                  <div className="loading-spinner"></div>
+                  <p>Chargement des options...</p>
+                </div>
+              ) : (
+                <div className="customization-categories">
+                  {customizationCategories.map(category => {
+                    const categoryOptions = customizationOptions.filter(opt => opt.category_id === category.id);
+                    const selections = selectedCustomizations[category.id];
+                    const selectionCount = category.max_selections === 1 
+                      ? (selections ? 1 : 0)
+                      : (Array.isArray(selections) ? selections.length : 0);
+
+                    return (
+                      <div key={category.id} className="customization-category">
+                        <div className="category-header">
+                          <h4>{category.name}</h4>
+                          <div className="category-rules">
+                            {category.is_required && (
+                              <span className="rule-badge required">Obligatoire</span>
+                            )}
+                            {!category.is_required && (
+                              <span className="rule-badge optional">Optionnel</span>
+                            )}
+                            {category.max_selections === 1 ? (
+                              <span className="rule-badge">Choix unique</span>
+                            ) : (
+                              <span className="rule-badge">
+                                {category.max_selections ? `Max ${category.max_selections}` : 'Illimité'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {category.description && (
+                          <p className="category-description">{category.description}</p>
+                        )}
+
+                        {customizationErrors[category.id] && (
+                          <div className="customization-error">
+                            <AlertCircle size={16} />
+                            <span>{customizationErrors[category.id]}</span>
+                          </div>
+                        )}
+                        
+                        <div className="category-options">
+                          {categoryOptions.map(option => {
+                            const isSelected = category.max_selections === 1 
+                              ? selections === option.id
+                              : Array.isArray(selections) && selections.includes(option.id);
+                            
+                            const isDisabled = !isSelected && category.max_selections && 
+                              category.max_selections > 1 && selectionCount >= category.max_selections;
+
+                            return (
+                              <button
+                                key={option.id}
+                                onClick={() => handleCustomizationToggle(category.id, option.id, category)}
+                                disabled={isDisabled}
+                                className={`customization-option ${isSelected ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}`}
+                              >
+                                <div className="option-check">
+                                  {isSelected && <Check size={16} />}
+                                </div>
+                                <div className="option-content">
+                                  <div className="option-name">{option.name}</div>
+                                  {option.description && (
+                                    <div className="option-description">{option.description}</div>
+                                  )}
+                                </div>
+                                {option.extra_price > 0 && (
+                                  <div className="option-price">+{parseFloat(option.extra_price).toFixed(2)}€</div>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            
+            <div className="customization-footer">
+              <div className="price-summary">
+                <div className="base-price">
+                  <span>Prix de base</span>
+                  <span>{parseFloat(selectedItem.price).toFixed(2)}€</span>
+                </div>
+                {calculateCustomizationPrice() > 0 && (
+                  <div className="extra-price">
+                    <span>Suppléments</span>
+                    <span>+{calculateCustomizationPrice().toFixed(2)}€</span>
+                  </div>
+                )}
+                <div className="total-price">
+                  <span>Total</span>
+                  <span>{(parseFloat(selectedItem.price) + calculateCustomizationPrice()).toFixed(2)}€</span>
+                </div>
+              </div>
+              <button 
+                onClick={handleCustomizedAddToCart}
+                className="add-to-cart-btn"
+                disabled={customizationLoading}
+              >
+                <Plus size={20} />
+                Ajouter au panier
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Cart Modal */}
       {cartOpen && (
         <div className="cart-overlay" onClick={() => setCartOpen(false)}>
@@ -346,11 +717,17 @@ export default function MenuPage({ params }) {
             
             <div className="cart-items">
               {cart.map(item => (
-                <div key={item.id} className="cart-item">
+                <div key={item.itemKey || item.id} className="cart-item">
                   <div className="cart-item-info">
                     <h4>{item.name}</h4>
                     <span className="cart-item-price">{parseFloat(item.price).toFixed(2)}€</span>
-                    {item.customizable && (
+                    {item.customizations && item.customizationText && (
+                      <div className="cart-item-customizations">
+                        <Settings size={12} />
+                        <span>{item.customizationText}</span>
+                      </div>
+                    )}
+                    {!item.customizations && item.customizable && (
                       <div className="cart-item-customizable">
                         <Settings size={12} />
                         <span>Personnalisable</span>
@@ -359,7 +736,7 @@ export default function MenuPage({ params }) {
                   </div>
                   <div className="cart-item-controls">
                     <button 
-                      onClick={() => removeFromCart(item.id)}
+                      onClick={() => removeFromCart(item.itemKey || item.id)}
                       className="cart-quantity-btn"
                     >
                       <Minus size={16} />
