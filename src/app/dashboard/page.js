@@ -1,7 +1,7 @@
 'use client'
 
 import { supabase } from '../../lib/supabase'
-import { supabase } from '../../../lib/supabase'
+
 import { useRouter } from 'next/navigation'
 import { 
   Plus, Edit3, Trash2, Eye, Settings, Clock, Calendar, 
