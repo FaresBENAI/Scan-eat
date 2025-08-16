@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { supabase } from '../../lib/supabase'
 import { supabase } from '../../../lib/supabase'
 import { useRouter } from 'next/navigation'
 import { 
   Plus, Edit3, Trash2, Eye, Settings, Clock, Calendar, 
   MoreVertical, Copy, ExternalLink, QrCode, ArrowLeft, X, Save
 } from 'lucide-react'
-import './menus.css'
+import './dashboard.css'
 
 export default function MenusList() {
   const [restaurant, setRestaurant] = useState(null)
