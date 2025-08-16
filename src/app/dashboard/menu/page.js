@@ -1,6 +1,8 @@
+export const dynamic = 'force-dynamic'
+
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { 
@@ -9,7 +11,8 @@ import {
 } from 'lucide-react';
 import './menu-management.css';
 
-export default function MenuManagement() {
+// Composant qui utilise useSearchParams
+function MenuManagementContent() {
   const [restaurant, setRestaurant] = useState(null);
   const [currentMenu, setCurrentMenu] = useState(null);
   const [categories, setCategories] = useState([]);
@@ -837,7 +840,7 @@ export default function MenuManagement() {
         </div>
       )}
 
-      {/* Contenu principal - RESTE IDENTIQUE sauf les modals */}
+      {/* Contenu principal */}
       <main className="menu-content">
         {categories.length === 0 ? (
           <div className="empty-state">
@@ -1001,8 +1004,6 @@ export default function MenuManagement() {
         )}
       </main>
 
-      {/* TOUTES LES MODALS RESTENT IDENTIQUES - Je vais juste copier les principales */}
-      
       {/* Modal Catégorie */}
       {showCategoryModal && (
         <div className="modal-overlay" onClick={() => !saving && setShowCategoryModal(false)}>
@@ -1070,7 +1071,7 @@ export default function MenuManagement() {
         </div>
       )}
 
-      {/* Modal Plat avec option Personnalisable */}
+      {/* Modal Plat */}
       {showItemModal && (
         <div className="modal-overlay" onClick={() => !saving && setShowItemModal(false)}>
           <div className="modal item-modal" onClick={(e) => e.stopPropagation()}>
@@ -1238,10 +1239,22 @@ export default function MenuManagement() {
           </div>
         </div>
       )}
-
-      {/* Toutes les autres modals de customisation restent identiques... */}
-      {/* Je les omets ici pour gagner de la place mais elles doivent être copiées de votre code original */}
-      
     </div>
+  );
+}
+
+// Composant principal avec Suspense
+export default function MenuManagement() {
+  return (
+    <Suspense fallback={
+      <div className="menu-management-loading">
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <p>Chargement...</p>
+        </div>
+      </div>
+    }>
+      <MenuManagementContent />
+    </Suspense>
   );
 }
