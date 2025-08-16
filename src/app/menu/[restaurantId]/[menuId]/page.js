@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { supabase } from '../../../../lib/supabase'
 import { 
-  ArrowLeft, Clock, MapPin, Phone, Plus, Minus, 
-  ShoppingCart, Check, Star, Info, ChevronDown, ChevronUp
+  ShoppingCart, Plus, Minus, Phone, MapPin, Clock, 
+  Star, ChefHat, X, ArrowLeft, Search, Filter, Settings,
+  Check, AlertCircle, User, Mail, Hash, Info, ChevronDown, ChevronUp
 } from 'lucide-react'
 import './menu-client.css'
 
@@ -12,11 +14,37 @@ export default function MenuClient({ params }) {
   const [restaurant, setRestaurant] = useState(null)
   const [menu, setMenu] = useState(null)
   const [categories, setCategories] = useState([])
+  const [menuItems, setMenuItems] = useState([])
   const [cart, setCart] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [showCart, setShowCart] = useState(false)
+  const [cartOpen, setCartOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState('all')
   const [expandedCategories, setExpandedCategories] = useState({})
+  
+  // États pour la modal de customisation
+  const [customizationOpen, setCustomizationOpen] = useState(false)
+  const [selectedItem, setSelectedItem] = useState(null)
+  const [customizations, setCustomizations] = useState({})
+  const [customizationCategories, setCustomizationCategories] = useState([])
+  const [customizationOptions, setCustomizationOptions] = useState([])
+  const [selectedCustomizations, setSelectedCustomizations] = useState({})
+  const [customizationErrors, setCustomizationErrors] = useState({})
+  const [customizationLoading, setCustomizationLoading] = useState(false)
+  
+  // États pour la finalisation de commande
+  const [checkoutOpen, setCheckoutOpen] = useState(false)
+  const [orderForm, setOrderForm] = useState({
+    customerName: '',
+    customerPhone: '',
+    customerEmail: '',
+    tableNumber: ''
+  })
+  const [orderErrors, setOrderErrors] = useState({})
+  const [orderLoading, setOrderLoading] = useState(false)
+  const [orderSuccess, setOrderSuccess] = useState(null)
+  
   const router = useRouter()
   const { restaurantId, menuId } = params
 
@@ -53,11 +81,29 @@ export default function MenuClient({ params }) {
       }
 
       setMenu(menuData.menu)
-      setCategories(menuData.menu.categories || [])
+      
+      // Organiser les données pour compatibilité avec l'ancien code
+      const allCategories = menuData.menu.categories || []
+      const allItems = []
+      
+      allCategories.forEach(category => {
+        if (category.menu_items) {
+          category.menu_items.forEach(item => {
+            allItems.push({
+              ...item,
+              category_id: category.id,
+              category_name: category.name
+            })
+          })
+        }
+      })
+      
+      setCategories(allCategories)
+      setMenuItems(allItems)
 
       // Étendre toutes les catégories par défaut
       const initialExpanded = {}
-      menuData.menu.categories?.forEach(category => {
+      allCategories.forEach(category => {
         initialExpanded[category.id] = true
       })
       setExpandedCategories(initialExpanded)
@@ -68,55 +114,6 @@ export default function MenuClient({ params }) {
     } finally {
       setLoading(false)
     }
-  }
-
-  const addToCart = (item, customizations = []) => {
-    const cartItem = {
-      id: `${item.id}-${Date.now()}`, // ID unique pour le panier
-      menuItemId: item.id,
-      name: item.name,
-      price: item.price,
-      image_url: item.image_url,
-      quantity: 1,
-      customizations: customizations,
-      totalPrice: item.price + customizations.reduce((sum, custom) => sum + (custom.extra_price || 0), 0)
-    }
-
-    setCart(prevCart => [...prevCart, cartItem])
-  }
-
-  const updateCartItemQuantity = (cartItemId, newQuantity) => {
-    if (newQuantity <= 0) {
-      removeFromCart(cartItemId)
-      return
-    }
-
-    setCart(prevCart => 
-      prevCart.map(item => 
-        item.id === cartItemId 
-          ? { ...item, quantity: newQuantity }
-          : item
-      )
-    )
-  }
-
-  const removeFromCart = (cartItemId) => {
-    setCart(prevCart => prevCart.filter(item => item.id !== cartItemId))
-  }
-
-  const getCartTotal = () => {
-    return cart.reduce((total, item) => total + (item.totalPrice * item.quantity), 0)
-  }
-
-  const getCartItemsCount = () => {
-    return cart.reduce((count, item) => count + item.quantity, 0)
-  }
-
-  const toggleCategory = (categoryId) => {
-    setExpandedCategories(prev => ({
-      ...prev,
-      [categoryId]: !prev[categoryId]
-    }))
   }
 
   const isMenuAvailable = () => {
@@ -150,21 +147,154 @@ export default function MenuClient({ params }) {
     return `${hours.start}-${hours.end} • ${formattedDays}`
   }
 
-  const handleOrder = async () => {
-    if (cart.length === 0) return
+  // Fonctions de gestion du panier (version complète)
+  const addToCart = (item, customizationData = null) => {
+    const cartItem = {
+      id: Date.now() + Math.random(),
+      menuItemId: item.id,
+      name: item.name,
+      price: parseFloat(item.price),
+      image_url: item.image_url,
+      quantity: 1,
+      customizations: customizationData?.selectedOptions || [],
+      specialInstructions: customizationData?.specialInstructions || '',
+      totalPrice: parseFloat(item.price) + (customizationData?.extraCost || 0)
+    }
+
+    setCart(prevCart => [...prevCart, cartItem])
+    setCustomizationOpen(false)
+    setSelectedItem(null)
+    setSelectedCustomizations({})
+  }
+
+  const updateCartItemQuantity = (cartItemId, newQuantity) => {
+    if (newQuantity <= 0) {
+      removeFromCart(cartItemId)
+      return
+    }
+
+    setCart(prevCart => 
+      prevCart.map(item => 
+        item.id === cartItemId 
+          ? { ...item, quantity: newQuantity }
+          : item
+      )
+    )
+  }
+
+  const removeFromCart = (cartItemId) => {
+    setCart(prevCart => prevCart.filter(item => item.id !== cartItemId))
+  }
+
+  const getCartTotal = () => {
+    return cart.reduce((total, item) => total + (item.totalPrice * item.quantity), 0)
+  }
+
+  const getCartItemsCount = () => {
+    return cart.reduce((count, item) => count + item.quantity, 0)
+  }
+
+  const clearCart = () => {
+    setCart([])
+  }
+
+  // Fonction de customisation
+  const openCustomization = async (item) => {
+    if (!item.customizable) {
+      addToCart(item)
+      return
+    }
+
+    setSelectedItem(item)
+    setCustomizationLoading(true)
+    setCustomizationOpen(true)
 
     try {
-      // Préparer les items pour l'API
-      const orderItems = cart.map(cartItem => ({
-        menu_item_id: cartItem.menuItemId,
-        quantity: cartItem.quantity,
-        special_instructions: cartItem.customizations.map(c => c.name).join(', ')
-      }))
+      // Charger les options de customisation depuis l'API
+      const response = await fetch(`/api/menu-items/${item.id}/customizations`)
+      const data = await response.json()
 
+      if (data.success) {
+        setCustomizationCategories(data.categories || [])
+        setCustomizationOptions(data.options || [])
+      }
+    } catch (error) {
+      console.error('Erreur chargement customizations:', error)
+    } finally {
+      setCustomizationLoading(false)
+    }
+  }
+
+  // Fonctions de filtrage
+  const filteredItems = menuItems.filter(item => {
+    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         (item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase()))
+    const matchesCategory = selectedCategory === 'all' || item.category_id === selectedCategory
+    const isAvailable = item.available !== false
+    
+    return matchesSearch && matchesCategory && isAvailable
+  })
+
+  const toggleCategory = (categoryId) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [categoryId]: !prev[categoryId]
+    }))
+  }
+
+  // Fonction de commande complète
+  const handleCheckout = () => {
+    if (cart.length === 0) return
+    if (!isMenuAvailable()) {
+      alert('Ce menu n\'est pas disponible actuellement')
+      return
+    }
+    setCheckoutOpen(true)
+    setCartOpen(false)
+  }
+
+  const validateOrderForm = () => {
+    const errors = {}
+    
+    if (!orderForm.customerName.trim()) {
+      errors.customerName = 'Le nom est requis'
+    }
+    
+    if (!orderForm.customerPhone.trim()) {
+      errors.customerPhone = 'Le téléphone est requis'
+    } else if (!/^[0-9+\-\s]{8,}$/.test(orderForm.customerPhone)) {
+      errors.customerPhone = 'Format de téléphone invalide'
+    }
+    
+    if (orderForm.customerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(orderForm.customerEmail)) {
+      errors.customerEmail = 'Format d\'email invalide'
+    }
+
+    setOrderErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
+  const submitOrder = async () => {
+    if (!validateOrderForm()) return
+
+    setOrderLoading(true)
+    
+    try {
       const orderData = {
         restaurant_id: restaurantId,
-        customer_name: 'Client',
-        items: orderItems,
+        menu_id: menuId,
+        customer_name: orderForm.customerName,
+        customer_phone: orderForm.customerPhone,
+        customer_email: orderForm.customerEmail || null,
+        table_number: orderForm.tableNumber || null,
+        items: cart.map(item => ({
+          menu_item_id: item.menuItemId,
+          quantity: item.quantity,
+          unit_price: item.price,
+          customizations: item.customizations,
+          special_instructions: item.specialInstructions
+        })),
+        total_amount: getCartTotal(),
         payment_method: 'cash'
       }
 
@@ -177,15 +307,26 @@ export default function MenuClient({ params }) {
       const result = await response.json()
 
       if (result.success) {
-        alert('Commande passée avec succès !')
-        setCart([])
-        setShowCart(false)
+        setOrderSuccess({
+          orderId: result.order.id,
+          orderNumber: result.order.order_number,
+          estimatedTime: result.order.estimated_time || '15-20 minutes'
+        })
+        clearCart()
+        setOrderForm({
+          customerName: '',
+          customerPhone: '',
+          customerEmail: '',
+          tableNumber: ''
+        })
       } else {
         alert('Erreur lors de la commande: ' + result.error)
       }
     } catch (error) {
       console.error('Erreur commande:', error)
       alert('Erreur lors de la commande')
+    } finally {
+      setOrderLoading(false)
     }
   }
 
@@ -234,10 +375,9 @@ export default function MenuClient({ params }) {
             <h2>{menu?.name}</h2>
           </div>
 
-          {/* Cart Button */}
           <button 
             className={`cart-btn ${cart.length > 0 ? 'has-items' : ''}`}
-            onClick={() => setShowCart(!showCart)}
+            onClick={() => setCartOpen(!cartOpen)}
           >
             <ShoppingCart size={20} />
             {cart.length > 0 && (
@@ -260,6 +400,36 @@ export default function MenuClient({ params }) {
             )}
           </div>
         </div>
+
+        {/* Search and Filters */}
+        <div className="menu-controls">
+          <div className="search-container">
+            <Search size={16} />
+            <input
+              type="text"
+              placeholder="Rechercher un plat..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="search-input"
+            />
+          </div>
+          
+          <div className="filter-container">
+            <Filter size={16} />
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="category-filter"
+            >
+              <option value="all">Toutes catégories</option>
+              {categories.map(category => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
       </header>
 
       {/* Menu unavailable warning */}
@@ -270,90 +440,99 @@ export default function MenuClient({ params }) {
         </div>
       )}
 
-      {/* Categories and Items */}
+      {/* Menu Content */}
       <main className="menu-content">
-        {categories.length === 0 ? (
+        {filteredItems.length === 0 ? (
           <div className="empty-menu">
-            <div className="empty-icon">🍽️</div>
-            <h3>Menu en cours de préparation</h3>
-            <p>Ce menu sera bientôt disponible avec de délicieux plats.</p>
+            <div className="empty-icon">🔍</div>
+            <h3>Aucun plat trouvé</h3>
+            <p>Essayez de modifier votre recherche ou vos filtres.</p>
           </div>
         ) : (
           <div className="categories-list">
-            {categories.map(category => (
-              <div key={category.id} className="category-section">
-                <div 
-                  className="category-header"
-                  onClick={() => toggleCategory(category.id)}
-                >
-                  <h3>{category.name}</h3>
-                  <button className="toggle-btn">
-                    {expandedCategories[category.id] ? 
-                      <ChevronUp size={20} /> : 
-                      <ChevronDown size={20} />
-                    }
-                  </button>
-                </div>
+            {categories
+              .filter(category => 
+                selectedCategory === 'all' || selectedCategory === category.id
+              )
+              .map(category => {
+                const categoryItems = filteredItems.filter(item => item.category_id === category.id)
+                if (categoryItems.length === 0) return null
 
-                {expandedCategories[category.id] && (
-                  <div className="items-grid">
-                    {category.menu_items?.filter(item => item.available !== false).map(item => (
-                      <div key={item.id} className="menu-item">
-                        {item.image_url && (
-                          <div className="item-image">
-                            <img src={item.image_url} alt={item.name} />
-                          </div>
-                        )}
-                        
-                        <div className="item-content">
-                          <div className="item-header">
-                            <h4>{item.name}</h4>
-                            <div className="item-price">
-                              {parseFloat(item.price).toFixed(2)}€
+                return (
+                  <div key={category.id} className="category-section">
+                    <div 
+                      className="category-header"
+                      onClick={() => toggleCategory(category.id)}
+                    >
+                      <h3>{category.name}</h3>
+                      <button className="toggle-btn">
+                        {expandedCategories[category.id] ? 
+                          <ChevronUp size={20} /> : 
+                          <ChevronDown size={20} />
+                        }
+                      </button>
+                    </div>
+
+                    {expandedCategories[category.id] && (
+                      <div className="items-grid">
+                        {categoryItems.map(item => (
+                          <div key={item.id} className="menu-item">
+                            {item.image_url && (
+                              <div className="item-image">
+                                <img src={item.image_url} alt={item.name} />
+                              </div>
+                            )}
+                            
+                            <div className="item-content">
+                              <div className="item-header">
+                                <h4>{item.name}</h4>
+                                <div className="item-price">
+                                  {parseFloat(item.price).toFixed(2)}€
+                                </div>
+                              </div>
+                              
+                              {item.description && (
+                                <p className="item-description">{item.description}</p>
+                              )}
+
+                              {item.customizable && (
+                                <div className="customizable-badge">
+                                  <Star size={14} />
+                                  <span>Personnalisable</span>
+                                </div>
+                              )}
+                              
+                              <button 
+                                className="add-to-cart-btn"
+                                onClick={() => item.customizable ? openCustomization(item) : addToCart(item)}
+                                disabled={!isMenuAvailable()}
+                              >
+                                <Plus size={16} />
+                                {item.customizable ? 'Personnaliser' : 'Ajouter'}
+                              </button>
                             </div>
                           </div>
-                          
-                          {item.description && (
-                            <p className="item-description">{item.description}</p>
-                          )}
-
-                          {item.customizable && (
-                            <div className="customizable-badge">
-                              <Star size={14} />
-                              <span>Personnalisable</span>
-                            </div>
-                          )}
-                          
-                          <button 
-                            className="add-to-cart-btn"
-                            onClick={() => addToCart(item)}
-                            disabled={!isMenuAvailable()}
-                          >
-                            <Plus size={16} />
-                            Ajouter
-                          </button>
-                        </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
                   </div>
-                )}
-              </div>
-            ))}
+                )
+              })}
           </div>
         )}
       </main>
 
       {/* Cart Sidebar */}
-      {showCart && (
-        <div className="cart-overlay" onClick={() => setShowCart(false)}>
+      {cartOpen && (
+        <div className="cart-overlay" onClick={() => setCartOpen(false)}>
           <div className="cart-sidebar" onClick={e => e.stopPropagation()}>
             <div className="cart-header">
               <h3>Votre commande</h3>
               <button 
                 className="close-cart"
-                onClick={() => setShowCart(false)}
+                onClick={() => setCartOpen(false)}
               >
-                ×
+                <X size={20} />
               </button>
             </div>
 
@@ -370,6 +549,20 @@ export default function MenuClient({ params }) {
                       <div key={item.id} className="cart-item">
                         <div className="cart-item-info">
                           <h4>{item.name}</h4>
+                          {item.customizations.length > 0 && (
+                            <div className="customizations-list">
+                              {item.customizations.map((custom, index) => (
+                                <span key={index} className="customization-tag">
+                                  {custom.name} {custom.extra_price > 0 && `(+${custom.extra_price.toFixed(2)}€)`}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {item.specialInstructions && (
+                            <p className="special-instructions">
+                              Note: {item.specialInstructions}
+                            </p>
+                          )}
                           <div className="cart-item-price">
                             {item.totalPrice.toFixed(2)}€
                           </div>
@@ -400,8 +593,8 @@ export default function MenuClient({ params }) {
                     </div>
                     
                     <button 
-                      className="order-btn"
-                      onClick={handleOrder}
+                      className="checkout-btn"
+                      onClick={handleCheckout}
                       disabled={!isMenuAvailable()}
                     >
                       <Check size={16} />
@@ -411,6 +604,242 @@ export default function MenuClient({ params }) {
                 </>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Customization Modal */}
+      {customizationOpen && selectedItem && (
+        <div className="modal-overlay">
+          <div className="customization-modal">
+            <div className="modal-header">
+              <h3>Personnaliser: {selectedItem.name}</h3>
+              <button 
+                className="close-modal"
+                onClick={() => setCustomizationOpen(false)}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="modal-content">
+              {customizationLoading ? (
+                <div className="loading-spinner"></div>
+              ) : (
+                <>
+                  <div className="item-summary">
+                    <div className="item-price">
+                      Prix de base: {parseFloat(selectedItem.price).toFixed(2)}€
+                    </div>
+                  </div>
+
+                  {customizationCategories.map(category => (
+                    <div key={category.id} className="customization-category">
+                      <h4>{category.name}</h4>
+                      {category.required && <span className="required">*</span>}
+                      
+                      <div className="customization-options">
+                        {customizationOptions
+                          .filter(option => option.category_id === category.id)
+                          .map(option => (
+                            <label key={option.id} className="customization-option">
+                              <input
+                                type={category.type === 'single' ? 'radio' : 'checkbox'}
+                                name={`category-${category.id}`}
+                                value={option.id}
+                                onChange={(e) => {
+                                  // Logique de sélection des customizations
+                                  // À implémenter selon vos besoins
+                                }}
+                              />
+                              <span>{option.name}</span>
+                              {option.extra_price > 0 && (
+                                <span className="extra-price">+{option.extra_price.toFixed(2)}€</span>
+                              )}
+                            </label>
+                          ))
+                        }
+                      </div>
+                    </div>
+                  ))}
+
+                  <div className="special-instructions">
+                    <label>Instructions spéciales (optionnel)</label>
+                    <textarea
+                      placeholder="Ex: Sans oignons, bien cuit..."
+                      value={selectedCustomizations.specialInstructions || ''}
+                      onChange={(e) => setSelectedCustomizations(prev => ({
+                        ...prev,
+                        specialInstructions: e.target.value
+                      }))}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              <button 
+                className="cancel-btn"
+                onClick={() => setCustomizationOpen(false)}
+              >
+                Annuler
+              </button>
+              <button 
+                className="add-customized-btn"
+                onClick={() => addToCart(selectedItem, selectedCustomizations)}
+                disabled={customizationLoading}
+              >
+                Ajouter au panier
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Checkout Modal */}
+      {checkoutOpen && (
+        <div className="modal-overlay">
+          <div className="checkout-modal">
+            <div className="modal-header">
+              <h3>Finaliser la commande</h3>
+              <button 
+                className="close-modal"
+                onClick={() => setCheckoutOpen(false)}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="modal-content">
+              {orderSuccess ? (
+                <div className="order-success">
+                  <div className="success-icon">
+                    <Check size={48} />
+                  </div>
+                  <h3>Commande confirmée !</h3>
+                  <p>Numéro de commande: #{orderSuccess.orderNumber}</p>
+                  <p>Temps d'attente estimé: {orderSuccess.estimatedTime}</p>
+                  <button 
+                    className="close-success-btn"
+                    onClick={() => {
+                      setCheckoutOpen(false)
+                      setOrderSuccess(null)
+                    }}
+                  >
+                    Fermer
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="order-summary">
+                    <h4>Récapitulatif</h4>
+                    {cart.map(item => (
+                      <div key={item.id} className="summary-item">
+                        <span>{item.name} x{item.quantity}</span>
+                        <span>{(item.totalPrice * item.quantity).toFixed(2)}€</span>
+                      </div>
+                    ))}
+                    <div className="summary-total">
+                      <strong>Total: {getCartTotal().toFixed(2)}€</strong>
+                    </div>
+                  </div>
+
+                  <form className="order-form">
+                    <div className="form-group">
+                      <label>
+                        <User size={16} />
+                        Nom complet *
+                      </label>
+                      <input
+                        type="text"
+                        value={orderForm.customerName}
+                        onChange={(e) => setOrderForm(prev => ({
+                          ...prev,
+                          customerName: e.target.value
+                        }))}
+                        className={orderErrors.customerName ? 'error' : ''}
+                      />
+                      {orderErrors.customerName && (
+                        <span className="error-message">{orderErrors.customerName}</span>
+                      )}
+                    </div>
+
+                    <div className="form-group">
+                      <label>
+                        <Phone size={16} />
+                        Téléphone *
+                      </label>
+                      <input
+                        type="tel"
+                        value={orderForm.customerPhone}
+                        onChange={(e) => setOrderForm(prev => ({
+                          ...prev,
+                          customerPhone: e.target.value
+                        }))}
+                        className={orderErrors.customerPhone ? 'error' : ''}
+                      />
+                      {orderErrors.customerPhone && (
+                        <span className="error-message">{orderErrors.customerPhone}</span>
+                      )}
+                    </div>
+
+                    <div className="form-group">
+                      <label>
+                        <Mail size={16} />
+                        Email (optionnel)
+                      </label>
+                      <input
+                        type="email"
+                        value={orderForm.customerEmail}
+                        onChange={(e) => setOrderForm(prev => ({
+                          ...prev,
+                          customerEmail: e.target.value
+                        }))}
+                        className={orderErrors.customerEmail ? 'error' : ''}
+                      />
+                      {orderErrors.customerEmail && (
+                        <span className="error-message">{orderErrors.customerEmail}</span>
+                      )}
+                    </div>
+
+                    <div className="form-group">
+                      <label>
+                        <Hash size={16} />
+                        Numéro de table (optionnel)
+                      </label>
+                      <input
+                        type="text"
+                        value={orderForm.tableNumber}
+                        onChange={(e) => setOrderForm(prev => ({
+                          ...prev,
+                          tableNumber: e.target.value
+                        }))}
+                      />
+                    </div>
+                  </form>
+                </>
+              )}
+            </div>
+
+            {!orderSuccess && (
+              <div className="modal-footer">
+                <button 
+                  className="cancel-btn"
+                  onClick={() => setCheckoutOpen(false)}
+                  disabled={orderLoading}
+                >
+                  Annuler
+                </button>
+                <button 
+                  className="submit-order-btn"
+                  onClick={submitOrder}
+                  disabled={orderLoading}
+                >
+                  {orderLoading ? 'Commande en cours...' : `Confirmer (${getCartTotal().toFixed(2)}€)`}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
