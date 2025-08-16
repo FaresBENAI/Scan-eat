@@ -1,8 +1,9 @@
 'use client'
 
+import { useState, useEffect } from 'react'  // ✅ AJOUTER CETTE LIGNE si manquante
 import { supabase } from '../../lib/supabase'
-
 import { useRouter } from 'next/navigation'
+// ... reste des imports
 import { 
   Plus, Edit3, Trash2, Eye, Settings, Clock, Calendar, 
   MoreVertical, Copy, ExternalLink, QrCode, ArrowLeft, X, Save
