@@ -63,6 +63,95 @@ export default function Dashboard() {
     alert('URL du menu copiée !')
   }
 
+  const generateAndShowQR = () => {
+    const menuUrl = `${window.location.origin}/menu/${restaurant.id}`
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(menuUrl)}&margin=20`
+    
+    const printWindow = window.open('', '_blank')
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>QR Code Menu - ${restaurant.name}</title>
+          <style>
+            body { 
+              font-family: Arial, sans-serif; 
+              text-align: center; 
+              padding: 40px;
+              margin: 0;
+            }
+            .qr-container {
+              display: inline-block;
+              border: 2px solid #333;
+              padding: 30px;
+              border-radius: 10px;
+              background: white;
+            }
+            .restaurant-name {
+              font-size: 24px;
+              font-weight: bold;
+              margin-bottom: 15px;
+              color: #333;
+            }
+            .qr-image {
+              margin: 20px 0;
+            }
+            .instruction {
+              font-size: 16px;
+              color: #666;
+              margin-top: 15px;
+            }
+            .url {
+              font-size: 12px;
+              color: #999;
+              margin-top: 10px;
+              word-break: break-all;
+            }
+            .print-btn {
+              margin-top: 20px;
+              padding: 10px 20px;
+              background: #3b82f6;
+              color: white;
+              border: none;
+              border-radius: 5px;
+              cursor: pointer;
+              font-size: 14px;
+            }
+            @media print {
+              body { padding: 0; }
+              .print-btn { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="qr-container">
+            <div class="restaurant-name">${restaurant.name}</div>
+            <div class="qr-image">
+              <img src="${qrUrl}" alt="QR Code Menu" style="width: 250px; height: 250px;" />
+            </div>
+            <div class="instruction">
+              📱 Scannez pour voir nos menus
+            </div>
+            <div class="url">${menuUrl}</div>
+            <button class="print-btn" onclick="window.print()">Imprimer ce QR Code</button>
+          </div>
+        </body>
+      </html>
+    `)
+    printWindow.document.close()
+  }
+
+  const downloadQR = () => {
+    const menuUrl = `${window.location.origin}/menu/${restaurant.id}`
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(menuUrl)}&margin=20&format=png`
+    
+    const link = document.createElement('a')
+    link.href = qrUrl
+    link.download = `qr-menu-${restaurant.name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.png`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
   if (loading) {
     return (
       <div className="dashboard-loading">
@@ -158,7 +247,7 @@ export default function Dashboard() {
       {/* Main Actions */}
       <main className="dashboard-main">
         <div className="actions-grid">
-          {/* NOUVEAU: Bouton Gestion des Menus */}
+          {/* Gestion des Menus */}
           <div className="action-card featured">
             <div className="action-header">
               <div className="action-icon">
@@ -192,7 +281,7 @@ export default function Dashboard() {
             </button>
           </div>
 
-          {/* Gestion des Plats (modifié) */}
+          {/* Gestion des Plats */}
           <div className="action-card">
             <div className="action-header">
               <div className="action-icon">
@@ -252,26 +341,43 @@ export default function Dashboard() {
             </button>
           </div>
 
-          {/* QR Code et Partage */}
-          <div className="action-card">
+          {/* QR Code et Partage - SECTION AMÉLIORÉE */}
+          <div className="action-card qr-card">
             <div className="action-header">
               <div className="action-icon">
                 <QrCode size={28} />
               </div>
               <div className="action-content">
-                <h3>Menu QR Code</h3>
-                <p>Partagez votre menu via QR code</p>
+                <h3>QR Code Menu</h3>
+                <p>Partagez vos menus via QR code</p>
               </div>
             </div>
             <div className="qr-preview">
-              <div className="qr-placeholder">
-                <QrCode size={48} />
-              </div>
-              <p>Menu digital accessible</p>
+              {restaurant && (
+                <img 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(window.location.origin + '/menu/' + restaurant.id)}&margin=10`}
+                  alt="QR Code Menu"
+                  style={{
+                    width: '120px',
+                    height: '120px',
+                    border: '2px solid #e2e8f0',
+                    borderRadius: '8px',
+                    backgroundColor: 'white'
+                  }}
+                />
+              )}
+              <p>Sélection de menus</p>
             </div>
-            <div className="action-buttons">
+            <div className="action-buttons qr-buttons">
               <button onClick={copyQRUrl} className="action-btn secondary">
                 <span>Copier le lien</span>
+              </button>
+              <button onClick={downloadQR} className="action-btn secondary">
+                <QrCode size={16} />
+                <span>Télécharger</span>
+              </button>
+              <button onClick={generateAndShowQR} className="action-btn secondary">
+                <span>Imprimer QR</span>
               </button>
               <button 
                 onClick={() => window.open(`/menu/${restaurant?.id}`, '_blank')}
