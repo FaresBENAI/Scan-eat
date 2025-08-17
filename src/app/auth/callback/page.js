@@ -54,17 +54,18 @@ function CallbackContent() {
     try {
       addDebug('🚀 Début de la vérification');
 
-      // ✅ NOUVEAU: Gérer les fragments URL (#access_token=...)
+      // Gérer les fragments URL (#access_token=...)
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
       const urlParams = new URLSearchParams(window.location.search);
 
       // Récupérer les paramètres depuis le hash OU l'URL
       const access_token = hashParams.get('access_token') || urlParams.get('access_token');
       const refresh_token = hashParams.get('refresh_token') || urlParams.get('refresh_token');
-      const token = hashParams.get('token') || urlParams.get('token');
+      // ✅ CORRECTION: Accepter token_hash OU token
+      const token_hash = urlParams.get('token_hash') || urlParams.get('token') || hashParams.get('token');
       const type = hashParams.get('type') || urlParams.get('type');
 
-      addDebug(`📋 Tokens trouvés: access_token=${access_token ? 'OUI' : 'NON'}, refresh_token=${refresh_token ? 'OUI' : 'NON'}, type=${type}`);
+      addDebug(`📋 Tokens trouvés: access_token=${access_token ? 'OUI' : 'NON'}, refresh_token=${refresh_token ? 'OUI' : 'NON'}, token_hash=${token_hash ? 'OUI' : 'NON'}, type=${type}`);
 
       // Méthode 1: Si on a les tokens d'accès dans le hash
       if (access_token && refresh_token) {
@@ -87,7 +88,6 @@ function CallbackContent() {
           setStatus('success');
           setMessage('Votre compte a été confirmé avec succès.');
           
-          // Nettoyer l'URL
           window.history.replaceState({}, document.title, window.location.pathname);
           
           setTimeout(() => {
@@ -102,11 +102,11 @@ function CallbackContent() {
       }
 
       // Méthode 2: Code de confirmation classique
-      if (token && type) {
-        addDebug(`🔍 Tentative avec code de confirmation`);
+      if (token_hash && type) {
+        addDebug(`🔍 Tentative avec code de confirmation: ${token_hash.substring(0, 10)}...`);
         
         const { data, error } = await supabase.auth.verifyOtp({
-          token_hash: token,
+          token_hash: token_hash,
           type: 'email'
         });
 
@@ -235,7 +235,7 @@ function CallbackContent() {
                   <strong>Lien expiré ?</strong>
                   <span>Demandez un nouveau lien de confirmation</span>
                 </div>
-                <div className="solution-item">
+                <div class "solution-item">
                   <strong>Déjà confirmé ?</strong>
                   <span>Essayez de vous connecter directement</span>
                 </div>
