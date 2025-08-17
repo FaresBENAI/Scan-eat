@@ -192,14 +192,16 @@ const Homepage = () => {
             justifyContent: 'center',
             alignItems: 'center'
           }}>
-            <div style={{
+            <div className="phone-mockup" style={{
               width: '300px',
               height: '600px',
               backgroundColor: '#1d2129',
               borderRadius: '40px',
               padding: '20px',
               boxShadow: '0 20px 60px rgba(29, 33, 41, 0.3)',
-              position: 'relative'
+              position: 'relative',
+              transition: 'all 0.4s ease',
+              cursor: 'pointer'
             }}>
               <div style={{
                 width: '100%',
@@ -302,13 +304,14 @@ const Homepage = () => {
                 desc: 'Selon votre forfait : consultation, commande avec notifications, ou paiement intégré.'
               }
             ].map((feature, i) => (
-              <div key={i} style={{
+              <div key={i} className="feature-card" style={{
                 textAlign: 'center',
                 padding: '2rem',
                 borderRadius: '16px',
                 backgroundColor: '#f8f9fa',
                 border: '1px solid #e9ecef',
-                transition: 'all 0.3s ease'
+                transition: 'all 0.4s ease',
+                cursor: 'pointer'
               }}>
                 <div style={{
                   display: 'inline-flex',
@@ -370,7 +373,7 @@ const Homepage = () => {
                 'Expérience client moderne',
                 'Gestion des commandes en temps réel'
               ].map((benefit, i) => (
-                <div key={i} style={{
+                <div key={i} className="benefit-icon-item" style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '1rem'
@@ -383,7 +386,9 @@ const Homepage = () => {
                     height: '32px',
                     backgroundColor: '#1d2129',
                     borderRadius: '50%',
-                    color: 'white'
+                    color: 'white',
+                    transition: 'all 0.3s ease',
+                    cursor: 'pointer'
                   }}>
                     <Check size={16} />
                   </div>
@@ -462,16 +467,16 @@ const Homepage = () => {
           </p>
           <div style={{
             textAlign: 'center',
-            backgroundColor: '#e8f5e8',
-            color: '#2d5016',
+            backgroundColor: '#f8f9fa',
+            color: '#495057',
             padding: '1rem 2rem',
             borderRadius: '12px',
             marginBottom: '3rem',
             maxWidth: '600px',
             margin: '0 auto 3rem auto',
-            border: '1px solid #c3e6c3'
+            border: '2px solid #6c757d'
           }}>
-            <strong>🎉 Offre de lancement : 1 mois d'essai gratuit sur tous les forfaits !</strong>
+            <strong>Offre de lancement : 1 mois d'essai gratuit sur tous les forfaits</strong>
           </div>
           
           <div style={{
@@ -525,7 +530,7 @@ const Homepage = () => {
                 popular: false
               }
             ].map((plan, i) => (
-              <div key={i} style={{
+              <div key={i} className="pricing-card" style={{
                 position: 'relative',
                 padding: '2rem',
                 backgroundColor: plan.popular ? '#1d2129' : 'white',
@@ -534,7 +539,8 @@ const Homepage = () => {
                 border: plan.popular ? 'none' : '2px solid #e9ecef',
                 boxShadow: plan.popular ? '0 20px 60px rgba(29, 33, 41, 0.3)' : '0 4px 20px rgba(0,0,0,0.05)',
                 transform: plan.popular ? 'scale(1.05)' : 'none',
-                transition: 'all 0.3s ease'
+                transition: 'all 0.4s ease',
+                cursor: 'pointer'
               }}>
                 {plan.popular && (
                   <div style={{
@@ -691,7 +697,7 @@ const Homepage = () => {
           }}>
             Rejoignez des centaines de restaurants qui ont déjà fait le choix de l'innovation. Commencez gratuitement dès aujourd'hui.
           </p>
-          <a href="/auth/register" style={{
+          <a href="/auth/register" className="cta-section" style={{
             display: 'inline-flex',
             alignItems: 'center',
             gap: '0.5rem',
@@ -702,8 +708,9 @@ const Homepage = () => {
             borderRadius: '12px',
             fontWeight: '600',
             fontSize: '1.1rem',
-            transition: 'all 0.3s ease',
-            boxShadow: '0 4px 20px rgba(255,255,255,0.3)'
+            transition: 'all 0.4s ease',
+            boxShadow: '0 4px 20px rgba(255,255,255,0.3)',
+            cursor: 'pointer'
           }}>
             Démarrer gratuitement <ArrowRight size={20} />
           </a>
@@ -762,6 +769,57 @@ const Homepage = () => {
       </footer>
 
       <style jsx>{`
+        .header a:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 25px rgba(29, 33, 41, 0.15);
+        }
+
+        .hero a:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 8px 30px rgba(29, 33, 41, 0.25);
+        }
+
+        .hero button:hover {
+          transform: translateY(-3px);
+          background-color: #495057;
+          border-color: #495057;
+        }
+
+        .feature-card:hover {
+          transform: translateY(-8px);
+          box-shadow: 0 12px 40px rgba(29, 33, 41, 0.1);
+          background-color: white;
+        }
+
+        .benefit-icon-item:hover {
+          transform: scale(1.1);
+          background-color: #495057;
+        }
+
+        .pricing-card:hover {
+          transform: translateY(-10px);
+          box-shadow: 0 20px 60px rgba(29, 33, 41, 0.15);
+        }
+
+        .pricing-card a:hover {
+          transform: scale(1.05);
+          box-shadow: 0 6px 25px rgba(29, 33, 41, 0.2);
+        }
+
+        .cta-section a:hover {
+          transform: translateY(-3px) scale(1.05);
+          box-shadow: 0 8px 30px rgba(255, 255, 255, 0.4);
+        }
+
+        .footer a:hover {
+          color: #1d2129;
+          transform: translateY(-1px);
+        }
+
+        .phone-mockup:hover {
+          transform: translateY(-5px) rotateY(5deg);
+        }
+
         @media (max-width: 768px) {
           .desktop-nav {
             display: none !important;
