@@ -58,13 +58,15 @@ function CallbackContent() {
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
       const urlParams = new URLSearchParams(window.location.search);
 
-      // Récupérer les paramètres depuis le hash OU l'URL
+      // ✅ CORRECTION: Bien récupérer TOUS les paramètres
       const access_token = hashParams.get('access_token') || urlParams.get('access_token');
       const refresh_token = hashParams.get('refresh_token') || urlParams.get('refresh_token');
-      // ✅ CORRECTION: Accepter token_hash OU token
       const token_hash = urlParams.get('token_hash') || urlParams.get('token') || hashParams.get('token');
       const type = hashParams.get('type') || urlParams.get('type');
 
+      addDebug(`📋 URL complète: ${window.location.href}`);
+      addDebug(`📋 Hash: ${window.location.hash}`);
+      addDebug(`📋 Search: ${window.location.search}`);
       addDebug(`📋 Tokens trouvés: access_token=${access_token ? 'OUI' : 'NON'}, refresh_token=${refresh_token ? 'OUI' : 'NON'}, token_hash=${token_hash ? 'OUI' : 'NON'}, type=${type}`);
 
       // Méthode 1: Si on a les tokens d'accès dans le hash
@@ -235,7 +237,7 @@ function CallbackContent() {
                   <strong>Lien expiré ?</strong>
                   <span>Demandez un nouveau lien de confirmation</span>
                 </div>
-                <div class "solution-item">
+                <div className="solution-item">
                   <strong>Déjà confirmé ?</strong>
                   <span>Essayez de vous connecter directement</span>
                 </div>
