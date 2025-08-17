@@ -104,6 +104,17 @@ export default function Register() {
       });
 
       if (authError) throw authError;
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+  email: restaurantData.email,
+  password: restaurantData.password,
+});
+
+if (authError) throw authError;
+
+// 🔥 AJOUTEZ CETTE LIGNE ICI (ligne 90) :
+localStorage.setItem('pendingConfirmationEmail', restaurantData.email);
+
+let qrCodeUrl = null;
 
       let qrCodeUrl = null;
       if (authData.user) {
