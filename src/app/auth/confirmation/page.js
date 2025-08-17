@@ -12,6 +12,7 @@ export default function Confirmation() {
   const [isResending, setIsResending] = useState(false);
   const [resendSuccess, setResendSuccess] = useState(false);
   const [userEmail, setUserEmail] = useState('');
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const router = useRouter();
 
   // Timer pour renvoyer l'email
@@ -24,35 +25,75 @@ export default function Confirmation() {
     }
   }, [timeLeft]);
 
-  // Récupérer l'email depuis le localStorage
+  // ✅ POLLING ACTIF - Vérifier l'auth toutes les 2 secondes
   useEffect(() => {
     const email = localStorage.getItem('pendingConfirmationEmail') || '';
     setUserEmail(email);
     
-    // ✅ SIMPLE: Juste vérifier UNE fois si déjà connecté
-    checkIfAlreadyLoggedIn();
-  }, []);
+    let authInterval;
 
-  // Vérification simple au chargement (pas en boucle!)
-  const checkIfAlreadyLoggedIn = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session?.user) {
-        // User déjà connecté, rediriger selon le type
-        const userInfo = await detectUserType(session.user.id);
+    const checkAuthStatus = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
         
-        if (userInfo.type === 'restaurant') {
-          router.push('/dashboard');
-        } else {
-          router.push('/');
+        if (session?.user) {
+          console.log('✅ Utilisateur connecté détecté!', session.user.email);
+          setIsCheckingAuth(false);
+          
+          // Détecter le type et rediriger
+          const userInfo = await detectUserType(session.user.id);
+          
+          if (userInfo.type === 'restaurant') {
+            router.push('/dashboard');
+          } else {
+            router.push('/');
+          }
+          return true; // Arrêter le polling
+        }
+        return false; // Continuer le polling
+      } catch (error) {
+        console.log('En attente de confirmation...');
+        return false;
+      }
+    };
+
+    // Vérification immédiate
+    checkAuthStatus().then(connected => {
+      if (!connected) {
+        // Si pas encore connecté, démarrer le polling
+        authInterval = setInterval(async () => {
+          const isNowConnected = await checkAuthStatus();
+          if (isNowConnected) {
+            clearInterval(authInterval);
+          }
+        }, 2000); // Vérifier toutes les 2 secondes
+      }
+    });
+
+    // ✅ AUSSI écouter les changements d'état Supabase
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('🔄 Changement auth détecté:', event, session?.user?.email);
+        
+        if (event === 'SIGNED_IN' && session?.user) {
+          if (authInterval) clearInterval(authInterval);
+          
+          const userInfo = await detectUserType(session.user.id);
+          
+          if (userInfo.type === 'restaurant') {
+            router.push('/dashboard');
+          } else {
+            router.push('/');
+          }
         }
       }
-    } catch (error) {
-      // Pas grave, rester sur la page
-      console.log('Pas encore connecté');
-    }
-  };
+    );
+
+    return () => {
+      if (authInterval) clearInterval(authInterval);
+      subscription.unsubscribe();
+    };
+  }, [router]);
 
   const detectUserType = async (userId) => {
     try {
@@ -197,25 +238,46 @@ export default function Confirmation() {
           )}
         </div>
 
-        {/* Instructions simples */}
-        <div style={{
-          backgroundColor: '#e8f4f8',
-          border: '1px solid #bee5eb',
-          borderRadius: '12px',
-          padding: '1.5rem',
-          marginBottom: '2rem',
-          textAlign: 'center'
-        }}>
-          <p style={{
-            color: '#0c5460',
-            fontSize: '0.95rem',
-            margin: 0,
-            lineHeight: 1.5
+        {/* Status en temps réel */}
+        {isCheckingAuth && (
+          <div style={{
+            backgroundColor: '#e8f4f8',
+            border: '1px solid #bee5eb',
+            borderRadius: '12px',
+            padding: '1.5rem',
+            marginBottom: '2rem',
+            textAlign: 'center'
           }}>
-            <strong>Cliquez sur le lien dans votre email</strong><br/>
-            Vous serez automatiquement connecté après confirmation
-          </p>
-        </div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.75rem',
+              marginBottom: '0.5rem'
+            }}>
+              <div style={{
+                width: '20px',
+                height: '20px',
+                border: '2px solid transparent',
+                borderTop: '2px solid #0c5460',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite'
+              }}></div>
+              <span style={{ color: '#0c5460', fontWeight: '600' }}>
+                Détection automatique en cours...
+              </span>
+            </div>
+            <p style={{
+              color: '#0c5460',
+              fontSize: '0.9rem',
+              margin: 0,
+              lineHeight: 1.5
+            }}>
+              <strong>Cliquez sur le lien dans votre email</strong><br/>
+              Cette page se mettra automatiquement à jour (même depuis un autre appareil)
+            </p>
+          </div>
+        )}
 
         {/* Resend Section */}
         <div style={{ marginBottom: '2rem' }}>
