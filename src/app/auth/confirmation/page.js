@@ -15,7 +15,6 @@ export default function Confirmation() {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const router = useRouter();
 
-  // Timer pour renvoyer l'email
   useEffect(() => {
     if (timeLeft > 0) {
       const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
@@ -25,94 +24,155 @@ export default function Confirmation() {
     }
   }, [timeLeft]);
 
-  // ✅ POLLING CROSS-DEVICE AMÉLIORÉ
+  // ✅ CROSS-DEVICE avec vérification email_verified
   useEffect(() => {
     const email = localStorage.getItem('pendingConfirmationEmail') || '';
     setUserEmail(email);
     
     let authInterval;
     let attempts = 0;
-    const maxAttempts = 120; // 4 minutes max
+    const maxAttempts = 120; // 4 minutes
 
-    const checkAuthStatus = async () => {
+    const checkEmailVerified = async () => {
       try {
         attempts++;
+        console.log(`🔍 Vérification ${attempts}/${maxAttempts} pour: ${email}`);
         
-        // Vérifier la session Supabase
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.log('Erreur session:', error.message);
-          return false;
-        }
+        // ✅ MÉTHODE 1: Vérifier session locale
+        const { data: { session } } = await supabase.auth.getSession();
         
         if (session?.user) {
-          console.log('✅ Utilisateur confirmé détecté!', session.user.email);
+          console.log('✅ Session locale trouvée');
           setIsCheckingAuth(false);
-          
-          // Détecter le type et rediriger
           const userInfo = await detectUserType(session.user.id);
-          
-          // Petite animation de succès
-          setResendSuccess(true);
-          
-          setTimeout(() => {
-            if (userInfo.type === 'restaurant') {
-              router.push('/dashboard');
-            } else {
-              router.push('/');
-            }
-          }, 1000);
-          
-          return true; // Arrêter le polling
+          redirectUser(userInfo.type);
+          return true;
         }
-        
-        // Arrêter après 4 minutes
+
+        // ✅ MÉTHODE 2: Vérifier si l'email est confirmé dans auth.users
+        if (email) {
+          try {
+            // Utiliser RPC pour vérifier le statut email
+            const { data: emailStatus, error: rpcError } = await supabase
+              .rpc('check_email_verified', { user_email: email });
+
+            if (rpcError) {
+              console.log('❌ Erreur RPC:', rpcError.message);
+              // Fallback: chercher dans nos tables
+              return await checkInOurTables(email);
+            }
+
+            if (emailStatus && emailStatus.length > 0 && emailStatus[0].email_verified) {
+              console.log('✅ Email confirmé détecté dans auth.users!');
+              
+              // L'email est confirmé, on peut maintenant essayer de récupérer la session
+              // ou rediriger vers la connexion
+              setIsCheckingAuth(false);
+              const userType = await getUserTypeFromEmail(email);
+              
+              // Message de succès puis redirection vers login
+              setResendSuccess(true);
+              setTimeout(() => {
+                router.push(`/auth/login?email=${encodeURIComponent(email)}`);
+              }, 2000);
+              
+              return true;
+            }
+          } catch (rpcError) {
+            console.log('🔄 RPC non disponible, fallback vers nos tables');
+            return await checkInOurTables(email);
+          }
+        }
+
+        // Arrêter après le temps maximum
         if (attempts >= maxAttempts) {
-          console.log('⏰ Timeout: arrêt du polling après 4 minutes');
+          console.log('⏰ Timeout: arrêt du polling');
           setIsCheckingAuth(false);
           return true;
         }
-        
-        return false; // Continuer le polling
+
+        return false;
       } catch (error) {
-        console.log('Erreur vérification auth:', error.message);
+        console.log('Erreur vérification:', error.message);
         return false;
       }
     };
 
-    // Vérification immédiate
-    checkAuthStatus().then(connected => {
+    const checkInOurTables = async (email) => {
+      // Vérifier dans nos tables si l'utilisateur existe
+      // (ce qui indique qu'il s'est inscrit et donc potentiellement confirmé)
+      
+      const { data: restaurantData } = await supabase
+        .from('restaurants')
+        .select('id, email')
+        .eq('email', email)
+        .single();
+
+      const { data: customerData } = await supabase
+        .from('customers')
+        .select('id, email')
+        .eq('email', email)
+        .single();
+
+      if (restaurantData || customerData) {
+        console.log('✅ Utilisateur trouvé dans nos tables');
+        setIsCheckingAuth(false);
+        setResendSuccess(true);
+        
+        setTimeout(() => {
+          router.push(`/auth/login?email=${encodeURIComponent(email)}`);
+        }, 2000);
+        
+        return true;
+      }
+      
+      return false;
+    };
+
+    const getUserTypeFromEmail = async (email) => {
+      const { data: restaurantData } = await supabase
+        .from('restaurants')
+        .select('id')
+        .eq('email', email)
+        .single();
+
+      return restaurantData ? 'restaurant' : 'customer';
+    };
+
+    const redirectUser = (userType) => {
+      setResendSuccess(true);
+      setTimeout(() => {
+        if (userType === 'restaurant') {
+          router.push('/dashboard');
+        } else {
+          router.push('/');
+        }
+      }, 1000);
+    };
+
+    // Démarrer les vérifications
+    checkEmailVerified().then(connected => {
       if (!connected) {
-        // Si pas encore connecté, démarrer le polling
         authInterval = setInterval(async () => {
-          const isNowConnected = await checkAuthStatus();
+          const isNowConnected = await checkEmailVerified();
           if (isNowConnected) {
             clearInterval(authInterval);
           }
-        }, 2000); // Vérifier toutes les 2 secondes
+        }, 3000); // Toutes les 3 secondes
       }
     });
 
-    // ✅ ÉCOUTER les changements d'état Supabase (important!)
+    // Écouter les changements Supabase
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('🔄 Changement auth détecté:', event, session?.user?.email);
+        console.log('🔄 Changement auth:', event);
         
         if (event === 'SIGNED_IN' && session?.user) {
           if (authInterval) clearInterval(authInterval);
           setIsCheckingAuth(false);
           
           const userInfo = await detectUserType(session.user.id);
-          setResendSuccess(true);
-          
-          setTimeout(() => {
-            if (userInfo.type === 'restaurant') {
-              router.push('/dashboard');
-            } else {
-              router.push('/');
-            }
-          }, 1000);
+          redirectUser(userInfo.type);
         }
       }
     );
@@ -131,11 +191,7 @@ export default function Confirmation() {
         .eq('id', userId)
         .single();
 
-      if (restaurantData) {
-        return { type: 'restaurant' };
-      }
-
-      return { type: 'customer' };
+      return restaurantData ? { type: 'restaurant' } : { type: 'customer' };
     } catch (error) {
       return { type: 'customer' };
     }
@@ -157,8 +213,6 @@ export default function Confirmation() {
         setResendSuccess(true);
         setTimeLeft(60);
         setCanResend(false);
-      } else {
-        throw new Error('Email non trouvé');
       }
     } catch (error) {
       console.error('Erreur renvoi email:', error);
@@ -183,7 +237,6 @@ export default function Confirmation() {
       padding: '2rem',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
     }}>
-      {/* Back button */}
       <Link href="/auth/register" style={{
         position: 'absolute',
         top: '2rem',
@@ -209,7 +262,6 @@ export default function Confirmation() {
         boxShadow: '0 20px 60px rgba(29, 33, 41, 0.1)',
         border: '1px solid rgba(233, 236, 239, 0.5)'
       }}>
-        {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <div style={{
             display: 'flex',
@@ -266,7 +318,6 @@ export default function Confirmation() {
           )}
         </div>
 
-        {/* Status en temps réel */}
         {isCheckingAuth && (
           <div style={{
             backgroundColor: '#e8f4f8',
@@ -292,7 +343,7 @@ export default function Confirmation() {
                 animation: 'spin 1s linear infinite'
               }}></div>
               <span style={{ color: '#0c5460', fontWeight: '600' }}>
-                Détection automatique active...
+                Détection automatique...
               </span>
             </div>
             <p style={{
@@ -302,14 +353,13 @@ export default function Confirmation() {
               lineHeight: 1.5
             }}>
               <strong>Cliquez sur le lien dans votre email</strong><br/>
-              Cette page détectera automatiquement votre confirmation<br/>
-              <em>(même depuis un autre appareil)</em>
+              Vérification du statut de confirmation<br/>
+              <em>(fonctionne même depuis un autre appareil)</em>
             </p>
           </div>
         )}
 
-        {/* Message de succès si détecté */}
-        {resendSuccess && !isCheckingAuth && (
+        {resendSuccess && (
           <div style={{
             backgroundColor: '#d4edda',
             border: '1px solid #c3e6cb',
@@ -327,13 +377,12 @@ export default function Confirmation() {
             }}>
               <CheckCircle size={24} />
               <span style={{ fontWeight: '600' }}>
-                Confirmation détectée ! Redirection...
+                Email confirmé ! Redirection vers la connexion...
               </span>
             </div>
           </div>
         )}
 
-        {/* Resend Section */}
         <div style={{ marginBottom: '2rem' }}>
           <div style={{ textAlign: 'center' }}>
             <p style={{
@@ -395,33 +444,17 @@ export default function Confirmation() {
           </div>
         </div>
 
-        {/* Footer */}
         <div style={{
           textAlign: 'center',
           paddingTop: '1.5rem',
           borderTop: '1px solid #e9ecef'
         }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '1rem',
-            marginBottom: '1rem'
-          }}>
-            <Link href="/auth/login" style={{
-              color: '#495057',
-              textDecoration: 'none'
-            }}>
-              Se connecter
+          <p style={{ color: '#6c757d', margin: 0 }}>
+            💡 Confirmé sur un autre appareil ?{' '}
+            <Link href="/auth/login" style={{ color: '#1d2129', fontWeight: '600' }}>
+              Connectez-vous ici
             </Link>
-            <span style={{ color: '#e9ecef' }}>•</span>
-            <Link href="/auth/register" style={{
-              color: '#495057',
-              textDecoration: 'none'
-            }}>
-              Nouveau compte
-            </Link>
-          </div>
+          </p>
         </div>
       </div>
 
