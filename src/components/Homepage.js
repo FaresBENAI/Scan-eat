@@ -480,11 +480,12 @@ const Homepage = () => {
           </div>
           
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+            display: 'flex',
+            justifyContent: 'center',
             gap: '2rem',
-            maxWidth: '1000px',
-            margin: '0 auto'
+            maxWidth: '1200px',
+            margin: '0 auto',
+            flexWrap: 'wrap'
           }}>
             {[
               {
@@ -540,7 +541,9 @@ const Homepage = () => {
                 boxShadow: plan.popular ? '0 20px 60px rgba(29, 33, 41, 0.3)' : '0 4px 20px rgba(0,0,0,0.05)',
                 transform: plan.popular ? 'scale(1.05)' : 'none',
                 transition: 'all 0.4s ease',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                minWidth: '300px',
+                maxWidth: '350px'
               }}>
                 {plan.popular && (
                   <div style={{
@@ -820,6 +823,12 @@ const Homepage = () => {
           transform: translateY(-5px) rotateY(5deg);
         }
 
+        @media (max-width: 1024px) {
+          .pricing-section .pricing-cards {
+            justify-content: center;
+          }
+        }
+
         @media (max-width: 768px) {
           .desktop-nav {
             display: none !important;
@@ -836,6 +845,10 @@ const Homepage = () => {
           }
           .benefits-grid {
             grid-template-columns: 1fr !important;
+          }
+          .pricing-section .pricing-cards {
+            flex-direction: column;
+            align-items: center;
           }
         }
       `}</style>
