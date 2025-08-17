@@ -1,6 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { supabase } from '../../../lib/supabase';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { QrCode, User, Building2, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 
 export default function Register() {
@@ -29,6 +32,26 @@ export default function Register() {
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const router = useRouter();
+
+  const generateQRCode = async (restaurantId) => {
+    try {
+      const menuUrl = `${window.location.origin}/menu/${restaurantId}`;
+      const QRCode = await import('qrcode');
+      const qrCodeDataUrl = await QRCode.default.toDataURL(menuUrl, {
+        width: 300,
+        margin: 2,
+        color: {
+          dark: '#1d2129',
+          light: '#ffffff'
+        }
+      });
+      return qrCodeDataUrl;
+    } catch (error) {
+      console.error('Erreur génération QR:', error);
+      return null;
+    }
+  };
 
   const handleRestaurantChange = (e) => {
     setRestaurantData({
@@ -62,7 +85,7 @@ export default function Register() {
     return null;
   };
 
-  const handleRestaurantRegister = (e) => {
+  const handleRestaurantRegister = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
@@ -74,13 +97,46 @@ export default function Register() {
       return;
     }
 
-    // Simulation inscription
-    setTimeout(() => {
-      setLoading(false);
-    }, 2000);
+    try {
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: restaurantData.email,
+        password: restaurantData.password,
+      });
+
+      if (authError) throw authError;
+
+      let qrCodeUrl = null;
+      if (authData.user) {
+        qrCodeUrl = await generateQRCode(authData.user.id);
+      }
+
+      if (authData.user) {
+        const { error: profileError } = await supabase
+          .from('restaurants')
+          .insert([
+            {
+              id: authData.user.id,
+              email: restaurantData.email,
+              name: restaurantData.restaurantName,
+              phone: restaurantData.phone,
+              address: restaurantData.address,
+              qr_code_url: qrCodeUrl,
+            }
+          ]);
+
+        if (profileError) throw profileError;
+      }
+
+      router.push('/auth/confirmation');
+
+    } catch (error) {
+      setError(error.message);
+    }
+    
+    setLoading(false);
   };
 
-  const handleClientRegister = (e) => {
+  const handleClientRegister = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
@@ -92,10 +148,36 @@ export default function Register() {
       return;
     }
 
-    // Simulation inscription
-    setTimeout(() => {
-      setLoading(false);
-    }, 2000);
+    try {
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: clientData.email,
+        password: clientData.password,
+      });
+
+      if (authError) throw authError;
+
+      if (authData.user) {
+        const { error: profileError } = await supabase
+          .from('customers')
+          .insert([
+            {
+              id: authData.user.id,
+              name: clientData.name,
+              email: clientData.email,
+              phone: clientData.phone,
+            }
+          ]);
+
+        if (profileError) throw profileError;
+      }
+
+      router.push('/auth/confirmation');
+
+    } catch (error) {
+      setError(error.message);
+    }
+    
+    setLoading(false);
   };
 
   return (
@@ -109,7 +191,7 @@ export default function Register() {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
     }}>
       {/* Back button */}
-      <a href="/" style={{
+      <Link href="/" style={{
         position: 'absolute',
         top: '2rem',
         left: '2rem',
@@ -125,7 +207,7 @@ export default function Register() {
       }} className="back-btn">
         <ArrowLeft size={20} />
         <span>Retour à l'accueil</span>
-      </a>
+      </Link>
 
       <div style={{
         backgroundColor: 'white',
@@ -239,7 +321,7 @@ export default function Register() {
 
         {/* Restaurant Form */}
         {activeTab === 'restaurant' && (
-          <div>
+          <form onSubmit={handleRestaurantRegister}>
             <div style={{ marginBottom: '2rem' }}>
               <h3 style={{
                 fontSize: '1.25rem',
@@ -543,7 +625,181 @@ export default function Register() {
             )}
 
             <button 
-              onClick={handleRestaurantRegister}
+              type="submit"
+              disabled={loading}
+              style={{
+                width: '100%',
+                padding: '1rem',
+                backgroundColor: loading ? '#6c757d' : '#1d2129',
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                fontSize: '1rem',
+                fontWeight: '600',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                transition: 'all 0.3s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem',
+                marginBottom: '1rem'
+              }}
+              className="submit-btn"
+            >
+              {loading ? (
+                <div style={{
+                  width: '20px',
+                  height: '20px',
+                  border: '2px solid transparent',
+                  borderTop: '2px solid white',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite'
+                }}></div>
+              ) : (
+                'Créer mon compte client'
+              )}
+            </button>
+
+            <div style={{
+              textAlign: 'center',
+              padding: '1rem',
+              backgroundColor: '#f8f9fa',
+              borderRadius: '8px',
+              color: '#6c757d',
+              fontSize: '0.9rem'
+            }}>
+              Accédez à l'historique de vos commandes et au suivi en temps réel
+            </div>
+          </form>
+        )}
+
+        {/* Footer */}
+        <div style={{
+          textAlign: 'center',
+          paddingTop: '2rem',
+          borderTop: '1px solid #e9ecef',
+          marginTop: '2rem'
+        }}>
+          <p style={{
+            color: '#6c757d',
+            fontSize: '0.95rem',
+            margin: 0
+          }}>
+            Vous avez déjà un compte ?{' '}
+            <Link href="/auth/login" style={{
+              color: '#1d2129',
+              textDecoration: 'none',
+              fontWeight: '600',
+              transition: 'all 0.3s ease'
+            }} className="login-link">
+              Se connecter
+            </Link>
+          </p>
+        </div>
+      </div>
+
+      <style jsx>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+
+        .back-btn:hover {
+          transform: translateX(-3px);
+          color: #1d2129;
+        }
+
+        .register-card:hover {
+          transform: translateY(-5px);
+          box-shadow: 0 25px 80px rgba(29, 33, 41, 0.15);
+        }
+
+        .tab-btn:hover {
+          transform: translateY(-2px);
+          background-color: rgba(233, 236, 239, 0.7);
+        }
+
+        .form-input:focus {
+          border-color: #1d2129 !important;
+          box-shadow: 0 0 0 3px rgba(29, 33, 41, 0.1);
+        }
+
+        .form-input:hover {
+          border-color: #495057;
+        }
+
+        .password-toggle:hover {
+          color: #1d2129;
+          background-color: #f8f9fa;
+        }
+
+        .submit-btn:hover:not(:disabled) {
+          transform: translateY(-2px);
+          background-color: #495057;
+          box-shadow: 0 8px 25px rgba(29, 33, 41, 0.2);
+        }
+
+        .login-link:hover {
+          color: #495057;
+          text-decoration: underline;
+        }
+
+        @media (max-width: 768px) {
+          .back-btn {
+            position: static !important;
+            margin-bottom: 2rem;
+          }
+          
+          .register-card {
+            margin-top: 0;
+            padding: 2rem !important;
+          }
+
+          .form-row {
+            grid-template-columns: 1fr !important;
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+                        position: 'absolute',
+                        right: '1rem',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        color: '#6c757d',
+                        cursor: 'pointer',
+                        padding: '0.25rem',
+                        borderRadius: '4px',
+                        transition: 'all 0.3s ease'
+                      }}
+                      className="password-toggle"
+                    >
+                      {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {error && (
+              <div style={{
+                backgroundColor: '#f8d7da',
+                color: '#721c24',
+                padding: '0.75rem 1rem',
+                borderRadius: '8px',
+                marginBottom: '1.5rem',
+                fontSize: '0.9rem',
+                border: '1px solid #f5c6cb'
+              }}>
+                {error}
+              </div>
+            )}
+
+            <button 
+              type="submit"
               disabled={loading}
               style={{
                 width: '100%',
@@ -588,12 +844,12 @@ export default function Register() {
             }}>
               Votre QR code sera généré automatiquement
             </div>
-          </div>
+          </form>
         )}
 
         {/* Client Form */}
         {activeTab === 'client' && (
-          <div>
+          <form onSubmit={handleClientRegister}>
             <div style={{ marginBottom: '2rem' }}>
               <h3 style={{
                 fontSize: '1.25rem',
@@ -821,177 +1077,3 @@ export default function Register() {
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                       style={{
-                        position: 'absolute',
-                        right: '1rem',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        background: 'none',
-                        border: 'none',
-                        color: '#6c757d',
-                        cursor: 'pointer',
-                        padding: '0.25rem',
-                        borderRadius: '4px',
-                        transition: 'all 0.3s ease'
-                      }}
-                      className="password-toggle"
-                    >
-                      {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {error && (
-              <div style={{
-                backgroundColor: '#f8d7da',
-                color: '#721c24',
-                padding: '0.75rem 1rem',
-                borderRadius: '8px',
-                marginBottom: '1.5rem',
-                fontSize: '0.9rem',
-                border: '1px solid #f5c6cb'
-              }}>
-                {error}
-              </div>
-            )}
-
-            <button 
-              onClick={handleClientRegister}
-              disabled={loading}
-              style={{
-                width: '100%',
-                padding: '1rem',
-                backgroundColor: loading ? '#6c757d' : '#1d2129',
-                color: 'white',
-                border: 'none',
-                borderRadius: '12px',
-                fontSize: '1rem',
-                fontWeight: '600',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                transition: 'all 0.3s ease',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.5rem',
-                marginBottom: '1rem'
-              }}
-              className="submit-btn"
-            >
-              {loading ? (
-                <div style={{
-                  width: '20px',
-                  height: '20px',
-                  border: '2px solid transparent',
-                  borderTop: '2px solid white',
-                  borderRadius: '50%',
-                  animation: 'spin 1s linear infinite'
-                }}></div>
-              ) : (
-                'Créer mon compte client'
-              )}
-            </button>
-
-            <div style={{
-              textAlign: 'center',
-              padding: '1rem',
-              backgroundColor: '#f8f9fa',
-              borderRadius: '8px',
-              color: '#6c757d',
-              fontSize: '0.9rem'
-            }}>
-              Accédez à l'historique de vos commandes et au suivi en temps réel
-            </div>
-          </div>
-        )}
-
-        {/* Footer */}
-        <div style={{
-          textAlign: 'center',
-          paddingTop: '2rem',
-          borderTop: '1px solid #e9ecef',
-          marginTop: '2rem'
-        }}>
-          <p style={{
-            color: '#6c757d',
-            fontSize: '0.95rem',
-            margin: 0
-          }}>
-            Vous avez déjà un compte ?{' '}
-            <a href="/auth/login" style={{
-              color: '#1d2129',
-              textDecoration: 'none',
-              fontWeight: '600',
-              transition: 'all 0.3s ease'
-            }} className="login-link">
-              Se connecter
-            </a>
-          </p>
-        </div>
-      </div>
-
-      <style jsx>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-
-        .back-btn:hover {
-          transform: translateX(-3px);
-          color: #1d2129;
-        }
-
-        .register-card:hover {
-          transform: translateY(-5px);
-          box-shadow: 0 25px 80px rgba(29, 33, 41, 0.15);
-        }
-
-        .tab-btn:hover {
-          transform: translateY(-2px);
-          background-color: ${activeTab === 'restaurant' ? '#495057' : '#e9ecef'};
-        }
-
-        .form-input:focus {
-          border-color: #1d2129 !important;
-          box-shadow: 0 0 0 3px rgba(29, 33, 41, 0.1);
-        }
-
-        .form-input:hover {
-          border-color: #495057;
-        }
-
-        .password-toggle:hover {
-          color: #1d2129;
-          background-color: #f8f9fa;
-        }
-
-        .submit-btn:hover:not(:disabled) {
-          transform: translateY(-2px);
-          background-color: #495057;
-          box-shadow: 0 8px 25px rgba(29, 33, 41, 0.2);
-        }
-
-        .login-link:hover {
-          color: #495057;
-          text-decoration: underline;
-        }
-
-        @media (max-width: 768px) {
-          .back-btn {
-            position: static !important;
-            margin-bottom: 2rem;
-          }
-          
-          .register-card {
-            margin-top: 0;
-            padding: 2rem !important;
-          }
-
-          .form-row {
-            grid-template-columns: 1fr !important;
-          }
-        }
-      `}</style>
-    </div>
-  );
-}
