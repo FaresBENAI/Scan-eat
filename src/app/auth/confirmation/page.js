@@ -25,34 +25,58 @@ export default function Confirmation() {
     }
   }, [timeLeft]);
 
-  // ✅ POLLING ACTIF - Vérifier l'auth toutes les 2 secondes
+  // ✅ POLLING CROSS-DEVICE AMÉLIORÉ
   useEffect(() => {
     const email = localStorage.getItem('pendingConfirmationEmail') || '';
     setUserEmail(email);
     
     let authInterval;
+    let attempts = 0;
+    const maxAttempts = 120; // 4 minutes max
 
     const checkAuthStatus = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        attempts++;
+        
+        // Vérifier la session Supabase
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.log('Erreur session:', error.message);
+          return false;
+        }
         
         if (session?.user) {
-          console.log('✅ Utilisateur connecté détecté!', session.user.email);
+          console.log('✅ Utilisateur confirmé détecté!', session.user.email);
           setIsCheckingAuth(false);
           
           // Détecter le type et rediriger
           const userInfo = await detectUserType(session.user.id);
           
-          if (userInfo.type === 'restaurant') {
-            router.push('/dashboard');
-          } else {
-            router.push('/');
-          }
+          // Petite animation de succès
+          setResendSuccess(true);
+          
+          setTimeout(() => {
+            if (userInfo.type === 'restaurant') {
+              router.push('/dashboard');
+            } else {
+              router.push('/');
+            }
+          }, 1000);
+          
           return true; // Arrêter le polling
         }
+        
+        // Arrêter après 4 minutes
+        if (attempts >= maxAttempts) {
+          console.log('⏰ Timeout: arrêt du polling après 4 minutes');
+          setIsCheckingAuth(false);
+          return true;
+        }
+        
         return false; // Continuer le polling
       } catch (error) {
-        console.log('En attente de confirmation...');
+        console.log('Erreur vérification auth:', error.message);
         return false;
       }
     };
@@ -70,21 +94,25 @@ export default function Confirmation() {
       }
     });
 
-    // ✅ AUSSI écouter les changements d'état Supabase
+    // ✅ ÉCOUTER les changements d'état Supabase (important!)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('🔄 Changement auth détecté:', event, session?.user?.email);
         
         if (event === 'SIGNED_IN' && session?.user) {
           if (authInterval) clearInterval(authInterval);
+          setIsCheckingAuth(false);
           
           const userInfo = await detectUserType(session.user.id);
+          setResendSuccess(true);
           
-          if (userInfo.type === 'restaurant') {
-            router.push('/dashboard');
-          } else {
-            router.push('/');
-          }
+          setTimeout(() => {
+            if (userInfo.type === 'restaurant') {
+              router.push('/dashboard');
+            } else {
+              router.push('/');
+            }
+          }, 1000);
         }
       }
     );
@@ -264,7 +292,7 @@ export default function Confirmation() {
                 animation: 'spin 1s linear infinite'
               }}></div>
               <span style={{ color: '#0c5460', fontWeight: '600' }}>
-                Détection automatique en cours...
+                Détection automatique active...
               </span>
             </div>
             <p style={{
@@ -274,29 +302,39 @@ export default function Confirmation() {
               lineHeight: 1.5
             }}>
               <strong>Cliquez sur le lien dans votre email</strong><br/>
-              Cette page se mettra automatiquement à jour (même depuis un autre appareil)
+              Cette page détectera automatiquement votre confirmation<br/>
+              <em>(même depuis un autre appareil)</em>
             </p>
+          </div>
+        )}
+
+        {/* Message de succès si détecté */}
+        {resendSuccess && !isCheckingAuth && (
+          <div style={{
+            backgroundColor: '#d4edda',
+            border: '1px solid #c3e6cb',
+            borderRadius: '12px',
+            padding: '1.5rem',
+            marginBottom: '2rem',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.75rem',
+              color: '#155724'
+            }}>
+              <CheckCircle size={24} />
+              <span style={{ fontWeight: '600' }}>
+                Confirmation détectée ! Redirection...
+              </span>
+            </div>
           </div>
         )}
 
         {/* Resend Section */}
         <div style={{ marginBottom: '2rem' }}>
-          {resendSuccess && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              backgroundColor: '#d4edda',
-              color: '#155724',
-              padding: '0.75rem 1rem',
-              borderRadius: '8px',
-              marginBottom: '1rem'
-            }}>
-              <CheckCircle size={20} />
-              <span>Email envoyé avec succès !</span>
-            </div>
-          )}
-
           <div style={{ textAlign: 'center' }}>
             <p style={{
               color: '#6c757d',
