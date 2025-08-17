@@ -1,19 +1,20 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { supabase } from '../../../lib/supabase'
+import { useState, useEffect } from 'react'  // ✅ AJOUTER CETTE LIGNE si manquante
+import { supabase } from '../../lib/supabase'
 import { useRouter } from 'next/navigation'
+// ... reste des imports
 import { 
   Plus, Edit3, Trash2, Eye, Settings, Clock, Calendar, 
-  MoreVertical, Copy, ExternalLink, QrCode, ArrowLeft
+  MoreVertical, Copy, ExternalLink, QrCode, ArrowLeft, X, Save
 } from 'lucide-react'
-import './menus.css'
+import './dashboard.css'
 
 export default function MenusList() {
   const [restaurant, setRestaurant] = useState(null)
   const [menus, setMenus] = useState([])
   const [loading, setLoading] = useState(true)
-  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingMenu, setEditingMenu] = useState(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -25,7 +26,8 @@ export default function MenusList() {
     name: '',
     description: '',
     availability_hours: { start: '12:00', end: '14:00' },
-    availability_days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+    availability_days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+    active: true
   })
 
   const dayNames = {
@@ -37,6 +39,16 @@ export default function MenusList() {
     saturday: 'Samedi',
     sunday: 'Dimanche'
   }
+
+  const daysOfWeek = [
+    { key: 'monday', label: 'Lundi' },
+    { key: 'tuesday', label: 'Mardi' },
+    { key: 'wednesday', label: 'Mercredi' },
+    { key: 'thursday', label: 'Jeudi' },
+    { key: 'friday', label: 'Vendredi' },
+    { key: 'saturday', label: 'Samedi' },
+    { key: 'sunday', label: 'Dimanche' }
+  ]
 
   useEffect(() => {
     checkAuthAndLoad()
@@ -89,14 +101,15 @@ export default function MenusList() {
     }
   }
 
-  const openMenuForm = (menu = null) => {
+  const openCreateModal = (menu = null) => {
     if (menu) {
       setEditingMenu(menu)
       setFormData({
         name: menu.name,
         description: menu.description || '',
         availability_hours: menu.availability_hours || { start: '12:00', end: '14:00' },
-        availability_days: menu.availability_days || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+        availability_days: menu.availability_days || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+        active: menu.active !== false
       })
     } else {
       setEditingMenu(null)
@@ -104,13 +117,14 @@ export default function MenusList() {
         name: '',
         description: '',
         availability_hours: { start: '12:00', end: '14:00' },
-        availability_days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+        availability_days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+        active: true
       })
     }
-    setShowCreateForm(true)
+    setShowCreateModal(true)
   }
 
-  const saveMenuForm = async (e) => {
+  const handleCreateMenu = async (e) => {
     e.preventDefault()
     
     if (!formData.name.trim()) {
@@ -118,9 +132,19 @@ export default function MenusList() {
       return
     }
 
+    if (formData.availability_days.length === 0) {
+      setError('Sélectionnez au moins un jour de disponibilité')
+      return
+    }
+
+    if (formData.availability_hours.start >= formData.availability_hours.end) {
+      setError('L\'heure de fin doit être après l\'heure de début')
+      return
+    }
+
     setSaving(true)
     try {
-      const url = editingMenu ? '/api/menus' : '/api/menus'
+      const url = '/api/menus'
       const method = editingMenu ? 'PUT' : 'POST'
       const body = editingMenu 
         ? { id: editingMenu.id, restaurant_id: restaurant.id, ...formData }
@@ -136,7 +160,7 @@ export default function MenusList() {
       
       if (data.success) {
         setSuccess(editingMenu ? 'Menu modifié avec succès' : 'Menu créé avec succès')
-        setShowCreateForm(false)
+        setShowCreateModal(false)
         setEditingMenu(null)
         await loadMenus(restaurant.id)
       } else {
@@ -211,6 +235,16 @@ export default function MenusList() {
     }))
   }
 
+  const handleTimeChange = (timeType, value) => {
+    setFormData(prev => ({
+      ...prev,
+      availability_hours: {
+        ...prev.availability_hours,
+        [timeType]: value
+      }
+    }))
+  }
+
   const getMenuStats = (menu) => {
     const categoriesCount = menu.categories?.length || 0
     const itemsCount = menu.categories?.reduce((sum, cat) => 
@@ -224,6 +258,18 @@ export default function MenusList() {
     const url = `${window.location.origin}/menu/${restaurant.id}/${menuId}`
     navigator.clipboard.writeText(url)
     setSuccess('URL du menu copiée!')
+  }
+
+  const closeModal = () => {
+    setShowCreateModal(false)
+    setEditingMenu(null)
+    setFormData({
+      name: '',
+      description: '',
+      availability_hours: { start: '12:00', end: '14:00' },
+      availability_days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+      active: true
+    })
   }
 
   // Clear messages
@@ -268,7 +314,7 @@ export default function MenusList() {
           
           <button 
             className="btn-primary"
-            onClick={() => openMenuForm()}
+            onClick={() => openCreateModal()}
             disabled={saving}
           >
             <Plus size={20} />
@@ -325,7 +371,7 @@ export default function MenusList() {
             <p>Commencez par créer votre premier menu pour organiser vos plats</p>
             <button 
               className="btn-primary large"
-              onClick={() => openMenuForm()}
+              onClick={() => openCreateModal()}
               disabled={saving}
             >
               <Plus size={24} />
@@ -366,7 +412,7 @@ export default function MenusList() {
                       </button>
                       <button 
                         className="btn-icon"
-                        onClick={() => openMenuForm(menu)}
+                        onClick={() => openCreateModal(menu)}
                         title="Modifier le menu"
                       >
                         <Edit3 size={16} />
@@ -418,22 +464,26 @@ export default function MenusList() {
       </main>
 
       {/* Modal Création/Edition Menu */}
-      {showCreateForm && (
-        <div className="modal-overlay" onClick={() => !saving && setShowCreateForm(false)}>
-          <div className="modal large" onClick={e => e.stopPropagation()}>
+      {showCreateModal && (
+        <div className="modal-overlay" onClick={() => !saving && closeModal()}>
+          <div className="modal create-menu-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>{editingMenu ? 'Modifier le menu' : 'Nouveau menu'}</h2>
+              <h2>
+                <Plus size={24} />
+                {editingMenu ? 'Modifier le menu' : 'Nouveau menu'}
+              </h2>
               <button 
                 className="close-btn"
-                onClick={() => setShowCreateForm(false)}
+                onClick={closeModal}
                 disabled={saving}
               >
-                ×
+                <X size={24} />
               </button>
             </div>
 
-            <form onSubmit={saveMenuForm}>
+            <form onSubmit={handleCreateMenu}>
               <div className="modal-content">
+                {/* Nom du menu */}
                 <div className="form-group">
                   <label htmlFor="menuName">Nom du menu *</label>
                   <input
@@ -444,23 +494,29 @@ export default function MenusList() {
                     placeholder="Ex: Menu Midi, Menu Soir, Menu Enfant..."
                     required
                     disabled={saving}
+                    autoFocus
                   />
                 </div>
 
+                {/* Description */}
                 <div className="form-group">
-                  <label htmlFor="menuDescription">Description</label>
+                  <label htmlFor="menuDescription">Description du menu (optionnel)</label>
                   <textarea
                     id="menuDescription"
                     value={formData.description}
                     onChange={(e) => setFormData({...formData, description: e.target.value})}
-                    placeholder="Description du menu (optionnel)"
+                    placeholder="Décrivez ce menu..."
                     rows={3}
                     disabled={saving}
                   />
                 </div>
 
+                {/* Horaires de disponibilité */}
                 <div className="form-section">
-                  <h3>Disponibilité</h3>
+                  <h3>
+                    <Clock size={20} />
+                    Disponibilité
+                  </h3>
                   
                   <div className="form-row">
                     <div className="form-group">
@@ -469,44 +525,57 @@ export default function MenusList() {
                         id="startTime"
                         type="time"
                         value={formData.availability_hours.start}
-                        onChange={(e) => setFormData({
-                          ...formData, 
-                          availability_hours: {...formData.availability_hours, start: e.target.value}
-                        })}
+                        onChange={(e) => handleTimeChange('start', e.target.value)}
                         disabled={saving}
                       />
                     </div>
+                    
                     <div className="form-group">
                       <label htmlFor="endTime">Heure de fin</label>
                       <input
                         id="endTime"
                         type="time"
                         value={formData.availability_hours.end}
-                        onChange={(e) => setFormData({
-                          ...formData, 
-                          availability_hours: {...formData.availability_hours, end: e.target.value}
-                        })}
+                        onChange={(e) => handleTimeChange('end', e.target.value)}
                         disabled={saving}
                       />
                     </div>
                   </div>
+                </div>
 
-                  <div className="form-group">
-                    <label>Jours de disponibilité</label>
-                    <div className="days-selector">
-                      {Object.entries(dayNames).map(([key, name]) => (
-                        <label key={key} className="day-checkbox">
-                          <input
-                            type="checkbox"
-                            checked={formData.availability_days.includes(key)}
-                            onChange={() => handleDayToggle(key)}
-                            disabled={saving}
-                          />
-                          <span>{name}</span>
-                        </label>
-                      ))}
-                    </div>
+                {/* Jours de disponibilité */}
+                <div className="form-section">
+                  <h3>
+                    <Calendar size={20} />
+                    Jours de disponibilité
+                  </h3>
+                  
+                  <div className="days-selector">
+                    {daysOfWeek.map(day => (
+                      <label key={day.key} className="day-checkbox">
+                        <input
+                          type="checkbox"
+                          checked={formData.availability_days.includes(day.key)}
+                          onChange={() => handleDayToggle(day.key)}
+                          disabled={saving}
+                        />
+                        <span className="checkbox-label">{day.label}</span>
+                      </label>
+                    ))}
                   </div>
+                </div>
+
+                {/* Statut actif */}
+                <div className="form-group">
+                  <label className="checkbox-label main">
+                    <input
+                      type="checkbox"
+                      checked={formData.active}
+                      onChange={(e) => setFormData({...formData, active: e.target.checked})}
+                      disabled={saving}
+                    />
+                    <span>Menu actif (visible pour les clients)</span>
+                  </label>
                 </div>
               </div>
 
@@ -514,7 +583,7 @@ export default function MenusList() {
                 <button 
                   type="button" 
                   className="btn-secondary"
-                  onClick={() => setShowCreateForm(false)}
+                  onClick={closeModal}
                   disabled={saving}
                 >
                   Annuler
@@ -525,17 +594,267 @@ export default function MenusList() {
                   disabled={saving}
                 >
                   {saving ? (
-                    <div className="loading-spinner small"></div>
+                    <>
+                      <div className="loading-spinner small"></div>
+                      {editingMenu ? 'Modification...' : 'Création...'}
+                    </>
                   ) : (
-                    <Plus size={20} />
+                    <>
+                      <Save size={20} />
+                      {editingMenu ? 'Modifier le menu' : 'Créer le menu'}
+                    </>
                   )}
-                  {editingMenu ? 'Modifier' : 'Créer le menu'}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      <style jsx>{`
+        .modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.6);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          padding: 20px;
+        }
+
+        .modal {
+          background: white;
+          border-radius: 16px;
+          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+          max-width: 600px;
+          width: 100%;
+          max-height: 90vh;
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .modal-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 24px;
+          border-bottom: 1px solid #e2e8f0;
+          background: #f8fafc;
+        }
+
+        .modal-header h2 {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin: 0;
+          font-size: 20px;
+          font-weight: 600;
+          color: #1a202c;
+        }
+
+        .close-btn {
+          background: none;
+          border: none;
+          cursor: pointer;
+          padding: 8px;
+          border-radius: 8px;
+          color: #64748b;
+          transition: all 0.2s;
+        }
+
+        .close-btn:hover:not(:disabled) {
+          background: #e2e8f0;
+          color: #374151;
+        }
+
+        .modal-content {
+          padding: 24px;
+          overflow-y: auto;
+          flex: 1;
+        }
+
+        .form-group {
+          margin-bottom: 20px;
+        }
+
+        .form-group label {
+          display: block;
+          font-weight: 500;
+          color: #374151;
+          margin-bottom: 8px;
+          font-size: 14px;
+        }
+
+        .form-group input,
+        .form-group textarea {
+          width: 100%;
+          padding: 12px;
+          border: 1px solid #d1d5db;
+          border-radius: 8px;
+          font-size: 14px;
+          transition: border-color 0.2s;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+          outline: none;
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .form-section {
+          margin-bottom: 32px;
+          padding: 20px;
+          background: #f8fafc;
+          border-radius: 12px;
+          border: 1px solid #e2e8f0;
+        }
+
+        .form-section h3 {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin: 0 0 16px 0;
+          font-size: 16px;
+          font-weight: 600;
+          color: #374151;
+        }
+
+        .form-row {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 16px;
+        }
+
+        .days-selector {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+          gap: 12px;
+        }
+
+        .day-checkbox {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          cursor: pointer;
+          padding: 8px 12px;
+          border: 1px solid #d1d5db;
+          border-radius: 8px;
+          transition: all 0.2s;
+          background: white;
+        }
+
+        .day-checkbox:hover {
+          border-color: #3b82f6;
+          background: #f0f9ff;
+        }
+
+        .checkbox-label {
+          font-size: 14px;
+          color: #374151;
+          cursor: pointer;
+        }
+
+        .checkbox-label.main {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          font-size: 14px;
+          font-weight: 500;
+          cursor: pointer;
+        }
+
+        .modal-footer {
+          display: flex;
+          justify-content: flex-end;
+          gap: 12px;
+          padding: 24px;
+          border-top: 1px solid #e2e8f0;
+          background: #f8fafc;
+        }
+
+        .btn-primary,
+        .btn-secondary {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 12px 20px;
+          border-radius: 8px;
+          font-weight: 500;
+          font-size: 14px;
+          cursor: pointer;
+          transition: all 0.2s;
+          border: none;
+        }
+
+        .btn-primary {
+          background: #3b82f6;
+          color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+          background: #2563eb;
+        }
+
+        .btn-secondary {
+          background: white;
+          color: #374151;
+          border: 1px solid #d1d5db;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+          background: #f9fafb;
+        }
+
+        .btn-primary:disabled,
+        .btn-secondary:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .loading-spinner {
+          width: 16px;
+          height: 16px;
+          border: 2px solid transparent;
+          border-top: 2px solid currentColor;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+
+        .loading-spinner.small {
+          width: 14px;
+          height: 14px;
+        }
+
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 640px) {
+          .modal {
+            margin: 0;
+            border-radius: 0;
+            max-height: 100vh;
+          }
+          
+          .form-row {
+            grid-template-columns: 1fr;
+          }
+          
+          .days-selector {
+            grid-template-columns: repeat(2, 1fr);
+          }
+          
+          .modal-footer {
+            flex-direction: column;
+          }
+        }
+      `}</style>
     </div>
   )
 }
