@@ -1,13 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '../../../lib/supabase'  // ← CORRIGER ICI
+import { supabase } from '../../../lib/supabase'
 import { useRouter } from 'next/navigation'
 import { 
   Plus, Edit3, Trash2, Eye, Settings, Clock, Calendar, 
   MoreVertical, Copy, ExternalLink, QrCode, ArrowLeft, X, Save
 } from 'lucide-react'
-import './menus.css'  // ← CORRIGER ICI
+import './menus.css'
 
 export default function MenusList() {
   const [restaurant, setRestaurant] = useState(null)
@@ -20,7 +20,6 @@ export default function MenusList() {
   const [success, setSuccess] = useState('')
   const router = useRouter()
 
-  // Formulaire menu
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -62,7 +61,6 @@ export default function MenusList() {
         return
       }
 
-      // Récupérer infos restaurant
       const { data: restaurantData, error: restaurantError } = await supabase
         .from('restaurants')
         .select('*')
@@ -205,7 +203,6 @@ export default function MenusList() {
     }
 
     try {
-      // TODO: Implémenter DELETE dans l'API
       setError('Fonction de suppression à implémenter')
     } catch (error) {
       console.error('Erreur suppression menu:', error)
@@ -271,7 +268,6 @@ export default function MenusList() {
     })
   }
 
-  // Clear messages
   useEffect(() => {
     if (error || success) {
       const timer = setTimeout(() => {
@@ -295,7 +291,6 @@ export default function MenusList() {
 
   return (
     <div className="menus-list">
-      {/* Header */}
       <header className="menus-header">
         <div className="header-content">
           <button 
@@ -322,7 +317,6 @@ export default function MenusList() {
         </div>
       </header>
 
-      {/* Messages */}
       {error && (
         <div className="message error">
           <span>{error}</span>
@@ -335,7 +329,6 @@ export default function MenusList() {
         </div>
       )}
 
-      {/* Statistics */}
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-number">{menus.length}</div>
@@ -361,7 +354,6 @@ export default function MenusList() {
         </div>
       </div>
 
-      {/* Menus Grid */}
       <main className="menus-content">
         {menus.length === 0 ? (
           <div className="empty-state">
@@ -462,11 +454,18 @@ export default function MenusList() {
         )}
       </main>
 
-      {/* Modal Création/Edition Menu */}
       {showCreateModal && (
-        <div className="modal-overlay" onClick={() => !saving && closeModal()}>
-          <div className="modal create-menu-modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
+        <div 
+          className="modal-overlay" 
+          onClick={() => !saving && closeModal()}
+          style={{ overflowY: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+        >
+          <div 
+            className="modal create-menu-modal" 
+            onClick={e => e.stopPropagation()}
+            style={{ maxHeight: '90vh', margin: 'auto', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+          >
+            <div className="modal-header" style={{ flexShrink: 0 }}>
               <h2>
                 <Plus size={24} />
                 {editingMenu ? 'Modifier le menu' : 'Nouveau menu'}
@@ -480,9 +479,8 @@ export default function MenusList() {
               </button>
             </div>
 
-            <form onSubmit={handleCreateMenu}>
-              <div className="modal-content">
-                {/* Nom du menu */}
+            <form onSubmit={handleCreateMenu} style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1 }}>
+              <div className="modal-content" style={{ flex: 1, overflowY: 'auto' }}>
                 <div className="form-group">
                   <label htmlFor="menuName">Nom du menu *</label>
                   <input
@@ -497,7 +495,6 @@ export default function MenusList() {
                   />
                 </div>
 
-                {/* Description */}
                 <div className="form-group">
                   <label htmlFor="menuDescription">Description du menu (optionnel)</label>
                   <textarea
@@ -510,14 +507,13 @@ export default function MenusList() {
                   />
                 </div>
 
-                {/* Horaires de disponibilité */}
                 <div className="form-section">
                   <h3>
                     <Clock size={20} />
                     Disponibilité
                   </h3>
                   
-                  <div className="form-row">
+                  <div className="time-inputs">
                     <div className="form-group">
                       <label htmlFor="startTime">Heure de début</label>
                       <input
@@ -542,14 +538,13 @@ export default function MenusList() {
                   </div>
                 </div>
 
-                {/* Jours de disponibilité */}
                 <div className="form-section">
                   <h3>
                     <Calendar size={20} />
                     Jours de disponibilité
                   </h3>
                   
-                  <div className="days-selector">
+                  <div className="days-grid">
                     {daysOfWeek.map(day => (
                       <label key={day.key} className="day-checkbox">
                         <input
@@ -558,15 +553,14 @@ export default function MenusList() {
                           onChange={() => handleDayToggle(day.key)}
                           disabled={saving}
                         />
-                        <span className="checkbox-label">{day.label}</span>
+                        <span>{day.label}</span>
                       </label>
                     ))}
                   </div>
                 </div>
 
-                {/* Statut actif */}
                 <div className="form-group">
-                  <label className="checkbox-label main">
+                  <label className="checkbox-main">
                     <input
                       type="checkbox"
                       checked={formData.active}
@@ -578,7 +572,7 @@ export default function MenusList() {
                 </div>
               </div>
 
-              <div className="modal-footer">
+              <div className="modal-footer" style={{ flexShrink: 0 }}>
                 <button 
                   type="button" 
                   className="btn-secondary"
@@ -609,251 +603,6 @@ export default function MenusList() {
           </div>
         </div>
       )}
-
-      <style jsx>{`
-        .modal-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(0, 0, 0, 0.6);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 1000;
-          padding: 20px;
-        }
-
-        .modal {
-          background: white;
-          border-radius: 16px;
-          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
-          max-width: 600px;
-          width: 100%;
-          max-height: 90vh;
-          overflow: hidden;
-          display: flex;
-          flex-direction: column;
-        }
-
-        .modal-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 24px;
-          border-bottom: 1px solid #e2e8f0;
-          background: #f8fafc;
-        }
-
-        .modal-header h2 {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          margin: 0;
-          font-size: 20px;
-          font-weight: 600;
-          color: #1a202c;
-        }
-
-        .close-btn {
-          background: none;
-          border: none;
-          cursor: pointer;
-          padding: 8px;
-          border-radius: 8px;
-          color: #64748b;
-          transition: all 0.2s;
-        }
-
-        .close-btn:hover:not(:disabled) {
-          background: #e2e8f0;
-          color: #374151;
-        }
-
-        .modal-content {
-          padding: 24px;
-          overflow-y: auto;
-          flex: 1;
-        }
-
-        .form-group {
-          margin-bottom: 20px;
-        }
-
-        .form-group label {
-          display: block;
-          font-weight: 500;
-          color: #374151;
-          margin-bottom: 8px;
-          font-size: 14px;
-        }
-
-        .form-group input,
-        .form-group textarea {
-          width: 100%;
-          padding: 12px;
-          border: 1px solid #d1d5db;
-          border-radius: 8px;
-          font-size: 14px;
-          transition: border-color 0.2s;
-        }
-
-        .form-group input:focus,
-        .form-group textarea:focus {
-          outline: none;
-          border-color: #3b82f6;
-          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-        }
-
-        .form-section {
-          margin-bottom: 32px;
-          padding: 20px;
-          background: #f8fafc;
-          border-radius: 12px;
-          border: 1px solid #e2e8f0;
-        }
-
-        .form-section h3 {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          margin: 0 0 16px 0;
-          font-size: 16px;
-          font-weight: 600;
-          color: #374151;
-        }
-
-        .form-row {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 16px;
-        }
-
-        .days-selector {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-          gap: 12px;
-        }
-
-        .day-checkbox {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          cursor: pointer;
-          padding: 8px 12px;
-          border: 1px solid #d1d5db;
-          border-radius: 8px;
-          transition: all 0.2s;
-          background: white;
-        }
-
-        .day-checkbox:hover {
-          border-color: #3b82f6;
-          background: #f0f9ff;
-        }
-
-        .checkbox-label {
-          font-size: 14px;
-          color: #374151;
-          cursor: pointer;
-        }
-
-        .checkbox-label.main {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          font-size: 14px;
-          font-weight: 500;
-          cursor: pointer;
-        }
-
-        .modal-footer {
-          display: flex;
-          justify-content: flex-end;
-          gap: 12px;
-          padding: 24px;
-          border-top: 1px solid #e2e8f0;
-          background: #f8fafc;
-        }
-
-        .btn-primary,
-        .btn-secondary {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 12px 20px;
-          border-radius: 8px;
-          font-weight: 500;
-          font-size: 14px;
-          cursor: pointer;
-          transition: all 0.2s;
-          border: none;
-        }
-
-        .btn-primary {
-          background: #3b82f6;
-          color: white;
-        }
-
-        .btn-primary:hover:not(:disabled) {
-          background: #2563eb;
-        }
-
-        .btn-secondary {
-          background: white;
-          color: #374151;
-          border: 1px solid #d1d5db;
-        }
-
-        .btn-secondary:hover:not(:disabled) {
-          background: #f9fafb;
-        }
-
-        .btn-primary:disabled,
-        .btn-secondary:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-
-        .loading-spinner {
-          width: 16px;
-          height: 16px;
-          border: 2px solid transparent;
-          border-top: 2px solid currentColor;
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-        }
-
-        .loading-spinner.small {
-          width: 14px;
-          height: 14px;
-        }
-
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-
-        @media (max-width: 640px) {
-          .modal {
-            margin: 0;
-            border-radius: 0;
-            max-height: 100vh;
-          }
-          
-          .form-row {
-            grid-template-columns: 1fr;
-          }
-          
-          .days-selector {
-            grid-template-columns: repeat(2, 1fr);
-          }
-          
-          .modal-footer {
-            flex-direction: column;
-          }
-        }
-      `}</style>
     </div>
   )
 }
