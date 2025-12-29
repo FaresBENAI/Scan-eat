@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../../../../lib/supabase'
 import { 
   ShoppingCart, Plus, Minus, Phone, MapPin, Clock, 
   Star, ChefHat, X, ArrowLeft, Search, Filter, Settings,
@@ -147,7 +146,77 @@ export default function MenuClient({ params }) {
     return `${hours.start}-${hours.end} • ${formattedDays}`
   }
 
-  // Fonctions de gestion du panier (version complète)
+  // ====================================
+  // NOUVEAU SYSTÈME DE COMPTEUR
+  // ====================================
+
+  // Obtenir la quantité totale d'un item dans le panier (tous les carts items de ce menuItemId)
+  const getItemQuantity = (menuItemId) => {
+    return cart
+      .filter(item => item.menuItemId === menuItemId)
+      .reduce((sum, item) => sum + item.quantity, 0)
+  }
+
+  // Ajouter un item simple (sans customisation)
+  const addSimpleItem = (item) => {
+    // Chercher si l'item existe déjà dans le panier (sans customisation)
+    const existingItemIndex = cart.findIndex(
+      cartItem => cartItem.menuItemId === item.id && cartItem.customizations.length === 0
+    )
+
+    if (existingItemIndex >= 0) {
+      // Incrémenter la quantité
+      setCart(prevCart => 
+        prevCart.map((cartItem, index) => 
+          index === existingItemIndex 
+            ? { ...cartItem, quantity: cartItem.quantity + 1 }
+            : cartItem
+        )
+      )
+    } else {
+      // Créer un nouveau cart item
+      const cartItem = {
+        id: Date.now() + Math.random(),
+        menuItemId: item.id,
+        name: item.name,
+        price: parseFloat(item.price),
+        image_url: item.image_url,
+        quantity: 1,
+        customizations: [],
+        specialInstructions: '',
+        totalPrice: parseFloat(item.price)
+      }
+      setCart(prevCart => [...prevCart, cartItem])
+    }
+  }
+
+  // Retirer un item simple
+  const removeSimpleItem = (item) => {
+    // Chercher l'item dans le panier (sans customisation)
+    const existingItemIndex = cart.findIndex(
+      cartItem => cartItem.menuItemId === item.id && cartItem.customizations.length === 0
+    )
+
+    if (existingItemIndex >= 0) {
+      const currentQuantity = cart[existingItemIndex].quantity
+      
+      if (currentQuantity > 1) {
+        // Décrémenter la quantité
+        setCart(prevCart => 
+          prevCart.map((cartItem, index) => 
+            index === existingItemIndex 
+              ? { ...cartItem, quantity: cartItem.quantity - 1 }
+              : cartItem
+          )
+        )
+      } else {
+        // Supprimer l'item du panier
+        setCart(prevCart => prevCart.filter((_, index) => index !== existingItemIndex))
+      }
+    }
+  }
+
+  // Fonctions de gestion du panier (version complète pour customisation)
   const addToCart = (item, customizationData = null) => {
     const cartItem = {
       id: Date.now() + Math.random(),
@@ -201,7 +270,7 @@ export default function MenuClient({ params }) {
   // Fonction de customisation
   const openCustomization = async (item) => {
     if (!item.customizable) {
-      addToCart(item)
+      addSimpleItem(item)
       return
     }
 
@@ -475,44 +544,71 @@ export default function MenuClient({ params }) {
 
                     {expandedCategories[category.id] && (
                       <div className="items-grid">
-                        {categoryItems.map(item => (
-                          <div key={item.id} className="menu-item">
-                            {item.image_url && (
-                              <div className="item-image">
-                                <img src={item.image_url} alt={item.name} />
-                              </div>
-                            )}
-                            
-                            <div className="item-content">
-                              <div className="item-header">
-                                <h4>{item.name}</h4>
-                                <div className="item-price">
-                                  {parseFloat(item.price).toFixed(2)}€
+                        {categoryItems.map(item => {
+                          const itemQuantity = getItemQuantity(item.id)
+                          
+                          return (
+                            <div key={item.id} className="menu-item">
+                              {item.image_url && (
+                                <div className="item-image">
+                                  <img src={item.image_url} alt={item.name} />
                                 </div>
-                              </div>
-                              
-                              {item.description && (
-                                <p className="item-description">{item.description}</p>
                               )}
+                              
+                              <div className="item-content">
+                                <div className="item-header">
+                                  <h4>{item.name}</h4>
+                                  <div className="item-price">
+                                    {parseFloat(item.price).toFixed(2)}€
+                                  </div>
+                                </div>
+                                
+                                {item.description && (
+                                  <p className="item-description">{item.description}</p>
+                                )}
 
-                              {item.customizable && (
-                                <div className="customizable-badge">
-                                  <Star size={14} />
-                                  <span>Personnalisable</span>
-                                </div>
-                              )}
-                              
-                              <button 
-                                className="add-to-cart-btn"
-                                onClick={() => item.customizable ? openCustomization(item) : addToCart(item)}
-                                disabled={!isMenuAvailable()}
-                              >
-                                <Plus size={16} />
-                                {item.customizable ? 'Personnaliser' : 'Ajouter'}
-                              </button>
+                                {item.customizable && (
+                                  <div className="customizable-badge">
+                                    <Star size={14} />
+                                    <span>Personnalisable</span>
+                                  </div>
+                                )}
+                                
+                                {/* NOUVEAU SYSTÈME DE COMPTEUR */}
+                                {itemQuantity === 0 ? (
+                                  // Bouton "Ajouter" si quantité = 0
+                                  <button 
+                                    className="add-to-cart-btn"
+                                    onClick={() => item.customizable ? openCustomization(item) : addSimpleItem(item)}
+                                    disabled={!isMenuAvailable()}
+                                  >
+                                    <Plus size={16} />
+                                    {item.customizable ? 'Personnaliser' : 'Ajouter'}
+                                  </button>
+                                ) : (
+                                  // Compteur +/- si quantité > 0
+                                  <div className="item-counter">
+                                    <button 
+                                      className="counter-btn minus"
+                                      onClick={() => removeSimpleItem(item)}
+                                      disabled={!isMenuAvailable()}
+                                    >
+                                      <Minus size={16} />
+                                    </button>
+                                    <span className="counter-value">{itemQuantity}</span>
+                                    <button 
+                                      className="counter-btn plus"
+                                      onClick={() => item.customizable ? openCustomization(item) : addSimpleItem(item)}
+                                      disabled={!isMenuAvailable()}
+                                    >
+                                      <Plus size={16} />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     )}
                   </div>
